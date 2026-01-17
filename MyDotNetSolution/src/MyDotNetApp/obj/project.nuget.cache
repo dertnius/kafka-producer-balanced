@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "qOgm2v7m5cxQVDh5QVtjtcTKJD7aN4Hz5/m9+TzSIi6nml02HRlD1GhLCEnAO9X4P/3ZbUJnCJt2KeyFQ8zSUw==",
+  "dgSpecHash": "uROeku9BjUhgTqqAugWDjw5jYgsd0OAV5mEFwWwSn61D6CBliDmnvGJ5B0EXa2wlg2RwV/fnZDpDLd+VjO04eQ==",
   "success": true,
-  "projectFilePath": "c:\\Users\\midgard\\dev\\MyDotNetSolution\\src\\MyDotNetApp\\MyDotNetApp.csproj",
+  "projectFilePath": "C:\\Users\\midgard\\dev\\kafka-producer-balanced\\MyDotNetSolution\\src\\MyDotNetApp\\MyDotNetApp.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\midgard\\.nuget\\packages\\apache.avro\\1.12.0\\apache.avro.1.12.0.nupkg.sha512",
     "C:\\Users\\midgard\\.nuget\\packages\\azure.core\\1.35.0\\azure.core.1.35.0.nupkg.sha512",

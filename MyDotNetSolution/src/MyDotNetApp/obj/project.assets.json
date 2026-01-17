@@ -4030,11 +4030,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\midgard\\dev\\MyDotNetSolution\\src\\MyDotNetApp\\MyDotNetApp.csproj",
+      "projectUniqueName": "C:\\Users\\midgard\\dev\\kafka-producer-balanced\\MyDotNetSolution\\src\\MyDotNetApp\\MyDotNetApp.csproj",
       "projectName": "MyDotNetApp",
-      "projectPath": "C:\\Users\\midgard\\dev\\MyDotNetSolution\\src\\MyDotNetApp\\MyDotNetApp.csproj",
+      "projectPath": "C:\\Users\\midgard\\dev\\kafka-producer-balanced\\MyDotNetSolution\\src\\MyDotNetApp\\MyDotNetApp.csproj",
       "packagesPath": "C:\\Users\\midgard\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\midgard\\dev\\MyDotNetSolution\\src\\MyDotNetApp\\obj\\",
+      "outputPath": "C:\\Users\\midgard\\dev\\kafka-producer-balanced\\MyDotNetSolution\\src\\MyDotNetApp\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\midgard\\AppData\\Roaming\\NuGet\\NuGet.Config"
