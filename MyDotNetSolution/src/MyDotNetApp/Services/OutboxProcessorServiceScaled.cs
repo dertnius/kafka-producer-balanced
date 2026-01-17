@@ -3,6 +3,7 @@ using Dapper;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using MyDotNetApp.Models;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -20,18 +21,6 @@ using Confluent.SchemaRegistry;
 using Confluent.SchemaRegistry.Serdes;
 
 namespace MyDotNetApp.Services;
-
-public class KafkaOutboxSettings
-{
-    public string? BootstrapServers { get; set; }
-    public string? TopicName { get; set; }
-    public string? SchemaRegistryUrl { get; set; }
-    public int BatchSize { get; set; } = 50000;  // Increased from 10k for higher throughput
-    public int PollingIntervalMs { get; set; } = 10;  // Reduced from 100ms for faster polling
-    public int MaxConcurrentProducers { get; set; } = 20;  // Increased from 10 for more parallelism
-    public int MaxProducerBuffer { get; set; } = 200000;  // Increased from 50k to handle burst traffic
-    public int DatabaseConnectionPoolSize { get; set; } = 40;  // Increased from 20 for more db concurrency
-}
 
 public class OutboxProcessorServiceScaled : BackgroundService
 {
@@ -519,30 +508,3 @@ public class OutboxProcessorServiceScaled : BackgroundService
     }
 }
 
-/// <summary>
-/// Performance tracking
-/// </summary>
-public class PerformanceMetrics
-{
-    private long _fetched = 0;
-    private long _produced = 0;
-    private long _marked = 0;
-    private long _failed = 0;
-    private readonly Stopwatch _timer = Stopwatch.StartNew();
-
-    public void RecordFetched(int count) => Interlocked.Add(ref _fetched, count);
-    public void RecordProduced() => Interlocked.Increment(ref _produced);
-    public void RecordMarked(int count) => Interlocked.Add(ref _marked, count);
-    public void RecordFailed() => Interlocked.Increment(ref _failed);
-
-    public void LogMetrics(ILogger logger)
-    {
-        var elapsed = _timer.Elapsed.TotalSeconds;
-        var fetchedRate = _fetched / elapsed;
-        var producedRate = _produced / elapsed;
-        
-        logger.LogInformation(
-            "Metrics - Fetched: {Fetched} ({FetchedRate:F0}/s) | Produced: {Produced} ({ProducedRate:F0}/s) | Marked: {Marked} | Failed: {Failed} | Elapsed: {Elapsed:F1}s",
-            _fetched, fetchedRate, _produced, producedRate, _marked, _failed, elapsed);
-    }
-}
