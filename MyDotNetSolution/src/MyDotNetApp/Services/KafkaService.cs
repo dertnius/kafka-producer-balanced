@@ -52,12 +52,18 @@ namespace MyDotNetApp.Services
     {
         private readonly IKafkaProducerPool _producerPool;
         private readonly ILogger<KafkaService> _logger;
+        private readonly string _topicName;
         private const int DeliveryTimeoutMs = 30000; // 30 seconds
 
-        public KafkaService(IKafkaProducerPool producerPool, ILogger<KafkaService> logger)
+        public KafkaService(
+            IKafkaProducerPool producerPool,
+            Microsoft.Extensions.Options.IOptions<MyDotNetApp.Models.KafkaOutboxSettings> kafkaSettings,
+            ILogger<KafkaService> logger)
         {
             _producerPool = producerPool ?? throw new ArgumentNullException(nameof(producerPool));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            var settings = kafkaSettings?.Value ?? throw new ArgumentNullException(nameof(kafkaSettings));
+            _topicName = string.IsNullOrWhiteSpace(settings.TopicName) ? "default-topic" : settings.TopicName;
         }
 
         /// <summary>
@@ -112,7 +118,7 @@ namespace MyDotNetApp.Services
                     Value = $"{{\"id\": {item.Id}, \"code\": \"{item.Code}\", \"rank\": {item.Rank}}}"
                 };
 
-                var deliveryResult = await producer.ProduceAsync("default-topic", kafkaMessage, stoppingToken);
+                var deliveryResult = await producer.ProduceAsync(_topicName, kafkaMessage, stoppingToken);
 
                 _logger.LogInformation("Message {ItemId} produced to Kafka partition {Partition} at offset {Offset}",
                     item.Id, deliveryResult.Partition, deliveryResult.Offset);

@@ -37,6 +37,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
     private readonly ConcurrentBag<Task> _backgroundTasks;
     private readonly SemaphoreSlim _databaseSemaphore;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _mortgageStidLocks;
+    private readonly ConcurrentDictionary<string, long> _stidLastUsed;
     private PerformanceMetrics _metrics;
 
     public OutboxProcessorServiceScaled(
@@ -55,6 +56,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
         _backgroundTasks = new ConcurrentBag<Task>();
         _databaseSemaphore = new SemaphoreSlim(_kafkaSettings.DatabaseConnectionPoolSize);
         _mortgageStidLocks = new ConcurrentDictionary<string, SemaphoreSlim>();
+        _stidLastUsed = new ConcurrentDictionary<string, long>();
         _processingChannel = Channel.CreateBounded<OutboxMessage>(
             new BoundedChannelOptions(_kafkaSettings.MaxProducerBuffer)
             {
@@ -111,49 +113,69 @@ public class OutboxProcessorServiceScaled : BackgroundService
         // Start background tasks
         var pollingTask = PollOutboxAsync(stoppingToken);
         var producingTask = ProduceMessagesAsync(stoppingToken);
+        var cleanupTask = CleanupStidLocksAsync(stoppingToken);
         var metricsTask = ReportMetricsAsync(stoppingToken);
 
-        await Task.WhenAll(pollingTask, producingTask, metricsTask);
+        await Task.WhenAll(pollingTask, producingTask, metricsTask, cleanupTask);
     }
 
     /// <summary>
-    /// Task 1: Poll database for unprocessed messages
+    /// Task 1: Poll database for unprocessed messages with smart backoff
+    /// Only polls when messages are being processed, backs off when idle
     /// </summary>
     private async Task PollOutboxAsync(CancellationToken stoppingToken)
     {
         int currentPollingDelayMs = _kafkaSettings.PollingIntervalMs;
         int consecutiveEmptyPolls = 0;
+        var lastPollTime = DateTime.UtcNow;
 
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
+                // Check if processing channel has capacity before polling
+                // If channel is full, skip this poll to back off naturally
+                var channelCount = _processingChannel.Reader.Count;
+                var channelCapacity = _kafkaSettings.MaxProducerBuffer;
+                
+                if (channelCount > channelCapacity * 0.8)  // 80% full, back off
+                {
+                    _logger.LogDebug("Processing channel at {Percent}% capacity, backing off", 
+                        (channelCount * 100) / channelCapacity);
+                    await Task.Delay(Math.Min(currentPollingDelayMs * 2, _kafkaSettings.MaxPollingIntervalMs), stoppingToken);
+                    continue;
+                }
+
                 var messages = await GetUnprocessedMessagesAsync(stoppingToken);
+                var pollDuration = DateTime.UtcNow - lastPollTime;
+                lastPollTime = DateTime.UtcNow;
                 
                 if (messages.Count == 0)
                 {
                     consecutiveEmptyPolls++;
                     
-                    // Adaptive backoff: increase delay when idle
-                    if (_kafkaSettings.EnableAdaptiveBackoff && consecutiveEmptyPolls > 1)
+                    // Adaptive backoff: increase delay exponentially when idle
+                    if (_kafkaSettings.EnableAdaptiveBackoff)
                     {
                         currentPollingDelayMs = (int)Math.Min(
                             currentPollingDelayMs * _kafkaSettings.BackoffMultiplier,
                             _kafkaSettings.MaxPollingIntervalMs);
                         
-                        _logger.LogDebug("No messages found. Adaptive backoff: polling delay increased to {DelayMs}ms", 
-                            currentPollingDelayMs);
+                        _logger.LogDebug(
+                            "No messages found (poll #{EmptyCount}). Backing off to {DelayMs}ms", 
+                            consecutiveEmptyPolls, currentPollingDelayMs);
                     }
 
                     await Task.Delay(currentPollingDelayMs, stoppingToken);
                     continue;
                 }
 
-                // Reset to fast polling when work is found
+                // Reset backoff when work is found
                 consecutiveEmptyPolls = 0;
                 currentPollingDelayMs = _kafkaSettings.PollingIntervalMs;
 
-                _logger.LogDebug("Fetched {MessageCount} messages from outbox", messages.Count);
+                _logger.LogDebug("Fetched {MessageCount} messages from outbox (query took {Duration}ms)", 
+                    messages.Count, pollDuration.TotalMilliseconds);
                 _metrics.RecordFetched(messages.Count);
 
                 // Add messages to processing channel
@@ -169,7 +191,9 @@ public class OutboxProcessorServiceScaled : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error polling outbox");
-                await Task.Delay(1000, stoppingToken);
+                // Increase delay on error to avoid hammering DB
+                currentPollingDelayMs = Math.Min(currentPollingDelayMs * 2, _kafkaSettings.MaxPollingIntervalMs);
+                await Task.Delay(currentPollingDelayMs, stoppingToken);
             }
         }
 
@@ -201,7 +225,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
                 // Ensure ordering per MortgageStid - only one message per MortgageStid can be sent at a time
                 var stidKey = message.MortgageStid ?? string.Empty;
                 var stidLock = _mortgageStidLocks.GetOrAdd(stidKey, _ => new SemaphoreSlim(1, 1));
-                
+                _stidLastUsed[stidKey] = Environment.TickCount64;
                 await stidLock.WaitAsync(stoppingToken);
                 try
                 {
@@ -214,6 +238,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
                 finally
                 {
                     stidLock.Release();
+                    _stidLastUsed[stidKey] = Environment.TickCount64;
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -231,7 +256,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
 
 
     /// <summary>
-    /// Report performance metrics every 10 seconds
+    /// Report performance metrics and clean up stale locks every 10 seconds
     /// </summary>
     private async Task ReportMetricsAsync(CancellationToken stoppingToken)
     {
@@ -241,6 +266,9 @@ public class OutboxProcessorServiceScaled : BackgroundService
             {
                 await Task.Delay(10000, stoppingToken);
                 _metrics.LogMetrics(_logger);
+                
+                // Clean up stale STID locks to prevent memory leak
+                CleanupStaleSemaphores();
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -249,6 +277,58 @@ public class OutboxProcessorServiceScaled : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error reporting metrics");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Remove semaphores for STIDs that haven't been used in a while
+    /// Uses actual idle time, not alphabetical order
+    /// </summary>
+    private void CleanupStaleSemaphores()
+    {
+        const int maxLocksToKeep = 5000;   // More aggressive: keep only 5k
+        const long idleThresholdMs = 10000;  // Remove if idle > 10 seconds (not 120s)
+        
+        var now = Environment.TickCount64;
+        
+        // Clean by idle time, not alphabetical order
+        var staleKeys = _stidLastUsed
+            .Where(kvp => (now - kvp.Value) > idleThresholdMs)
+            .Select(kvp => kvp.Key)
+            .ToList();
+        
+        // Remove idle locks
+        foreach (var stidKey in staleKeys)
+        {
+            if (_mortgageStidLocks.TryRemove(stidKey, out var semaphore))
+            {
+                var ageMs = _stidLastUsed.TryGetValue(stidKey, out var lastUsed) ? now - lastUsed : 0;
+                semaphore?.Dispose();
+                _stidLastUsed.TryRemove(stidKey, out _);
+                _logger.LogDebug("Cleaned up idle semaphore for STID: {Stid} (age: {AgeMs}ms)", 
+                    stidKey, ageMs);
+            }
+        }
+        
+        // If still over limit, force removal of oldest unused
+        if (_mortgageStidLocks.Count > maxLocksToKeep)
+        {
+            var excess = _mortgageStidLocks.Count - maxLocksToKeep;
+            var forcedRemoval = _stidLastUsed
+                .OrderBy(x => x.Value)  // Oldest first by actual usage time
+                .Take(excess)
+                .Select(x => x.Key)
+                .ToList();
+            
+            foreach (var stidKey in forcedRemoval)
+            {
+                if (_mortgageStidLocks.TryRemove(stidKey, out var semaphore))
+                {
+                    semaphore?.Dispose();
+                    _stidLastUsed.TryRemove(stidKey, out _);
+                    _logger.LogWarning("Forced removal of semaphore for STID: {Stid} (memory pressure)", stidKey);
+                }
             }
         }
     }
@@ -264,7 +344,29 @@ public class OutboxProcessorServiceScaled : BackgroundService
                 // Use connection pooling - don't close between calls
                 await connection.OpenAsync(stoppingToken);
                 
+                // Ensure we only take the oldest unpublished row per MortgageStid so
+                // we never emit Id N+1 for a mortgage before Id N is published.
                 const string sql = @"
+                    WITH Candidate AS (
+                        SELECT
+                            Id,
+                            AggregateId,
+                            EventType,
+                            CAST(0 AS bit) AS Processed, -- compat placeholder (column absent)
+                            CreatedAt,
+                            ProcessedAt,
+                            Rank,
+                            SecType,
+                            Domain,
+                            MortgageStid,
+                            SecPoolCode,
+                            Publish,
+                            ProducedAt,
+                            ReceivedAt,
+                            ROW_NUMBER() OVER (PARTITION BY MortgageStid ORDER BY Id) AS rn
+                        FROM Outbox WITH (NOLOCK)
+                        WHERE Publish = 0
+                    )
                     SELECT TOP (@BatchSize)
                         Id,
                         AggregateId,
@@ -280,10 +382,9 @@ public class OutboxProcessorServiceScaled : BackgroundService
                         Publish,
                         ProducedAt,
                         ReceivedAt
-                    FROM Outbox WITH (NOLOCK)
-                    WHERE Publish = 0 AND Processed = 1
+                    FROM Candidate
+                    WHERE rn = 1
                     ORDER BY MortgageStid ASC, Id ASC";
-
                 var messages = await connection.QueryAsync<OutboxMessage>(
                     sql,
                     new { BatchSize = _kafkaSettings.BatchSize });
@@ -372,6 +473,44 @@ public class OutboxProcessorServiceScaled : BackgroundService
         finally
         {
             _databaseSemaphore.Release();
+        }
+    }
+
+    // Periodically clean up STID locks that haven't been used recently
+    private async Task CleanupStidLocksAsync(CancellationToken stoppingToken)
+    {
+        const int cleanupIntervalMs = 60000; // 60s
+        const long idleThresholdMs = 120000; // 120s
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(cleanupIntervalMs, stoppingToken);
+                var now = Environment.TickCount64;
+                foreach (var kvp in _stidLastUsed.ToArray())
+                {
+                    var idleMs = now - kvp.Value;
+                    if (idleMs > idleThresholdMs && _mortgageStidLocks.TryGetValue(kvp.Key, out var sem))
+                    {
+                        if (sem.CurrentCount == 1)
+                        {
+                            if (_mortgageStidLocks.TryRemove(kvp.Key, out var removed))
+                            {
+                                removed.Dispose();
+                                _stidLastUsed.TryRemove(kvp.Key, out _);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during STID locks cleanup");
+            }
         }
     }
 

@@ -34,7 +34,7 @@ namespace MyDotNetApp.Services
         public KafkaProducerPool(
             IConfiguration configuration,
             ILogger<KafkaProducerPool> logger,
-            int poolSize = 5)
+            int poolSize = 10)  // Increase default pool to match throughput
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _availableProducers = new ConcurrentQueue<IProducer<string, string>>();
@@ -43,14 +43,16 @@ namespace MyDotNetApp.Services
             var producerConfig = new ProducerConfig
             {
                 BootstrapServers = configuration["KafkaOutboxSettings:BootstrapServers"] ?? "localhost:9092",
-                Acks = Acks.All,
-                MessageTimeoutMs = 30000,
+                Acks = Acks.Leader,          // Only wait for leader (faster than Acks.All)
+                MessageTimeoutMs = 10000,    // Shorter timeout for high throughput
                 CompressionType = CompressionType.Snappy,
-                LingerMs = 10,
-                BatchSize = 1024 * 1024,  // 1 MB
-                QueueBufferingMaxMessages = 200000,
+                LingerMs = 10,               // Allow small batching window
+                BatchSize = 512 * 1024,      // 512 KB batches for better throughput
+                QueueBufferingMaxMessages = 100000,  // More buffer for burst traffic
+                QueueBufferingMaxKbytes = 262144,    // 256 MB max memory
                 SocketKeepaliveEnable = true,
-                RequestTimeoutMs = 30000
+                RequestTimeoutMs = 10000,
+                MaxInFlight = 5              // Allow more in-flight requests
             };
 
             // Create producer pool

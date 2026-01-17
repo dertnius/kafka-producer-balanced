@@ -48,14 +48,15 @@ public class Startup
         });
 
         // Add services
-        services.AddScoped<IOutboxService, OutboxService>();
+        services.AddScoped<IOutboxService>(sp => 
+            new OutboxService(connectionString, sp.GetRequiredService<ILogger<OutboxService>>()));
         
         // Register shared Kafka producer pool (singleton so all services use same pool)
         services.AddSingleton<IKafkaProducerPool>(sp =>
             new KafkaProducerPool(
                 sp.GetRequiredService<IConfiguration>(),
                 sp.GetRequiredService<ILogger<KafkaProducerPool>>(),
-                poolSize: 5));  // Configurable pool size
+                poolSize: 10));  // Match high-throughput needs
         
         services.AddScoped<IKafkaService, KafkaService>();
 
@@ -64,13 +65,17 @@ public class Startup
         var flushIntervalMs = Configuration.GetValue<int>("Publishing:FlushIntervalMs", 1000);
         services.AddSingleton<IPublishBatchHandler>(sp =>
             new PublishBatchHandler(
-                sp.GetRequiredService<IOutboxService>(),
+                sp,  // Pass IServiceProvider to create scopes for IOutboxService
                 sp.GetRequiredService<ILogger<PublishBatchHandler>>(),
                 batchSize,
                 flushIntervalMs));
 
         // Register flush background service for publish status updates
-        services.AddHostedService<PublishFlushBackgroundService>();
+        services.AddHostedService(sp =>
+            new PublishFlushBackgroundService(
+                sp.GetRequiredService<IPublishBatchHandler>(),
+                sp.GetRequiredService<ILogger<PublishFlushBackgroundService>>(),
+                flushIntervalMs));
 
         // Configure Kafka settings
         services.Configure<KafkaOutboxSettings>(Configuration.GetSection("KafkaOutboxSettings"));

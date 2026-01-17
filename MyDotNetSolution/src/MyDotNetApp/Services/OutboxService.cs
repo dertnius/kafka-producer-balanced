@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Extensions.Logging;
+using Microsoft.Data.SqlClient;
 
 namespace MyDotNetApp.Services
 {
@@ -24,12 +25,12 @@ namespace MyDotNetApp.Services
 
     public class OutboxService : IOutboxService
     {
-        private readonly IDbConnection _dbConnection;
+        private readonly string _connectionString;
         private readonly ILogger<OutboxService> _logger;
 
-        public OutboxService(IDbConnection dbConnection, ILogger<OutboxService> logger)
+        public OutboxService(string connectionString, ILogger<OutboxService> logger)
         {
-            _dbConnection = dbConnection ?? throw new System.ArgumentNullException(nameof(dbConnection));
+            _connectionString = connectionString ?? throw new System.ArgumentNullException(nameof(connectionString));
             _logger = logger ?? throw new System.ArgumentNullException(nameof(logger));
         }
 
@@ -37,6 +38,9 @@ namespace MyDotNetApp.Services
         {
             try
             {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync(cancellationToken);
+                
                 var query = @"
                     SELECT Id, Stid, Code, Rank, Processed, Retry, ErrorCode 
                     FROM Outbox WITH (NOLOCK)
@@ -50,7 +54,7 @@ namespace MyDotNetApp.Services
                     ORDER BY Stid, CASE WHEN Code IS NULL THEN 0 ELSE 1 END, Id 
                     OFFSET @Offset ROWS FETCH NEXT @BatchSize ROWS ONLY";
 
-                var result = await _dbConnection.QueryAsync<OutboxItem>(
+                var result = await connection.QueryAsync<OutboxItem>(
                     query,
                     new { Offset = offset, BatchSize = batchSize });
 
@@ -70,9 +74,12 @@ namespace MyDotNetApp.Services
 
             try
             {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync(cancellationToken);
+                
                 _logger.LogInformation("Processing empty Code message with ID: {Id}, Stid: {Stid}", item.Id, item.Stid);
 
-                await _dbConnection.ExecuteAsync(
+                await connection.ExecuteAsync(
                     "UPDATE SomeTable SET Processed = 1 WHERE Id = @Id",
                     new { Id = item.Id });
             }
@@ -87,7 +94,10 @@ namespace MyDotNetApp.Services
         {
             try
             {
-                await _dbConnection.ExecuteAsync(
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync(cancellationToken);
+                
+                await connection.ExecuteAsync(
                     "UPDATE Outbox SET Processed = 1, Retry = 0, ErrorCode = NULL WHERE Id = @Id",
                     new { Id = id });
                 
@@ -110,19 +120,22 @@ namespace MyDotNetApp.Services
 
             try
             {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync(cancellationToken);
+                
                 // Check retry count limit
                 if (item.Retry >= 5) // Max 5 retries
                 {
                     _logger.LogError("Message {MessageId} exceeded maximum retry attempts ({RetryCount}). ErrorCode: {ErrorCode}, Error: {ErrorMessage}",
                         item.Id, item.Retry, errorCode, errorMessage);
                     
-                    await _dbConnection.ExecuteAsync(
+                    await connection.ExecuteAsync(
                         "UPDATE Outbox SET Processed = -1 WHERE Id = @Id",
                         new { Id = item.Id });
                 }
                 else
                 {
-                    await _dbConnection.ExecuteAsync(
+                    await connection.ExecuteAsync(
                         "UPDATE Outbox SET Retry = Retry + 1, ErrorCode = @ErrorCode WHERE Id = @Id",
                         new { Id = item.Id, ErrorCode = errorCode });
 
@@ -144,7 +157,10 @@ namespace MyDotNetApp.Services
 
             try
             {
-                await _dbConnection.ExecuteAsync(
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync(cancellationToken);
+                
+                await connection.ExecuteAsync(
                     "UPDATE Outbox SET Processed = -1 WHERE Stid = @Stid",
                     new { Stid = stid });
 
@@ -161,7 +177,10 @@ namespace MyDotNetApp.Services
         {
             try
             {
-                await _dbConnection.ExecuteAsync(
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync(cancellationToken);
+                
+                await connection.ExecuteAsync(
                     "UPDATE Outbox SET Publish = 1 WHERE Id = @Id",
                     new { Id = id });
 
@@ -185,6 +204,9 @@ namespace MyDotNetApp.Services
 
             try
             {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync(cancellationToken);
+                
                 // Build parameterized query for batch update
                 var parameters = messageIds.Select((id, index) => $"@Id{index}").ToList();
                 var sql = $@"
@@ -198,9 +220,10 @@ namespace MyDotNetApp.Services
                     dynamicParams.Add($"@Id{i}", messageIds[i]);
                 }
 
-                var rowsAffected = await _dbConnection.ExecuteAsync(sql, dynamicParams);
+                var rowsAffected = await connection.ExecuteAsync(sql, dynamicParams);
 
-                _logger.LogDebug("Batch marked {RowCount} messages as published", rowsAffected);
+                _logger.LogInformation("Batch marked {RowCount}/{RequestedCount} messages as published (IDs: {FirstFew}...)", 
+                    rowsAffected, messageIds.Count, string.Join(",", messageIds.Take(5)));
             }
             catch (System.Exception ex)
             {
@@ -213,7 +236,10 @@ namespace MyDotNetApp.Services
         {
             try
             {
-                await _dbConnection.ExecuteAsync(
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync(cancellationToken);
+                
+                await connection.ExecuteAsync(
                     "UPDATE Outbox SET ProducedAt = @ProducedAt WHERE Id = @Id",
                     new { Id = id, ProducedAt = producedAt });
 
@@ -230,7 +256,10 @@ namespace MyDotNetApp.Services
         {
             try
             {
-                await _dbConnection.ExecuteAsync(
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync(cancellationToken);
+                
+                await connection.ExecuteAsync(
                     "UPDATE Outbox SET ReceivedAt = @ReceivedAt WHERE Id = @Id",
                     new { Id = id, ReceivedAt = receivedAt });
 

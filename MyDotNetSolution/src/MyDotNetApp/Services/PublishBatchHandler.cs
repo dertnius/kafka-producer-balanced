@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MyDotNetApp.Services
 {
@@ -25,7 +26,7 @@ namespace MyDotNetApp.Services
     /// </summary>
     public class PublishBatchHandler : IPublishBatchHandler
     {
-        private readonly IOutboxService _outboxService;
+        private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<PublishBatchHandler> _logger;
         private readonly int _batchSize;
         private readonly int _flushIntervalMs;
@@ -35,12 +36,12 @@ namespace MyDotNetApp.Services
         private readonly Stopwatch _timer;
 
         public PublishBatchHandler(
-            IOutboxService outboxService,
+            IServiceProvider serviceProvider,
             ILogger<PublishBatchHandler> logger,
             int batchSize = 5000,
             int flushIntervalMs = 1000)
         {
-            _outboxService = outboxService ?? throw new ArgumentNullException(nameof(outboxService));
+            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _batchSize = batchSize > 0 ? batchSize : throw new ArgumentException("Batch size must be greater than 0");
             _flushIntervalMs = flushIntervalMs > 0 ? flushIntervalMs : throw new ArgumentException("Flush interval must be greater than 0");
@@ -101,7 +102,11 @@ namespace MyDotNetApp.Services
             {
                 var stopwatch = Stopwatch.StartNew();
                 
-                await _outboxService.MarkMessagesAsPublishedBatchAsync(messageIds, cancellationToken);
+                // Create a new scope to get a fresh IOutboxService
+                using var scope = _serviceProvider.CreateScope();
+                var outboxService = scope.ServiceProvider.GetRequiredService<IOutboxService>();
+                
+                await outboxService.MarkMessagesAsPublishedBatchAsync(messageIds, cancellationToken);
                 
                 stopwatch.Stop();
                 var rate = (messageIds.Count / stopwatch.Elapsed.TotalSeconds);
