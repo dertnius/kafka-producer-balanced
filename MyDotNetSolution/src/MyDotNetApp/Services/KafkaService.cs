@@ -46,16 +46,17 @@ namespace MyDotNetApp.Services
 
     /// <summary>
     /// Implementation of IKafkaService for producing messages to Kafka
+    /// Uses shared producer pool for load balancing across services
     /// </summary>
     public class KafkaService : IKafkaService
     {
-        private readonly IProducer<string, string> _producer;
+        private readonly IKafkaProducerPool _producerPool;
         private readonly ILogger<KafkaService> _logger;
         private const int DeliveryTimeoutMs = 30000; // 30 seconds
 
-        public KafkaService(IProducer<string, string> producer, ILogger<KafkaService> logger)
+        public KafkaService(IKafkaProducerPool producerPool, ILogger<KafkaService> logger)
         {
-            _producer = producer ?? throw new ArgumentNullException(nameof(producer));
+            _producerPool = producerPool ?? throw new ArgumentNullException(nameof(producerPool));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -92,7 +93,7 @@ namespace MyDotNetApp.Services
         }
 
         /// <summary>
-        /// Produces a message to Kafka
+        /// Produces a message to Kafka using a producer from the shared pool
         /// </summary>
         public async Task ProduceMessageAsync(OutboxItem item, CancellationToken stoppingToken)
         {
@@ -103,13 +104,15 @@ namespace MyDotNetApp.Services
             {
                 _logger.LogDebug("Producing message for item {ItemId} to Kafka", item.Id);
 
+                var producer = _producerPool.GetProducer();
+                
                 var kafkaMessage = new Message<string, string>
                 {
                     Key = item.Stid ?? "unknown",
                     Value = $"{{\"id\": {item.Id}, \"code\": \"{item.Code}\", \"rank\": {item.Rank}}}"
                 };
 
-                var deliveryResult = await _producer.ProduceAsync("default-topic", kafkaMessage, stoppingToken);
+                var deliveryResult = await producer.ProduceAsync("default-topic", kafkaMessage, stoppingToken);
 
                 _logger.LogInformation("Message {ItemId} produced to Kafka partition {Partition} at offset {Offset}",
                     item.Id, deliveryResult.Partition, deliveryResult.Offset);

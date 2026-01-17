@@ -49,6 +49,14 @@ public class Startup
 
         // Add services
         services.AddScoped<IOutboxService, OutboxService>();
+        
+        // Register shared Kafka producer pool (singleton so all services use same pool)
+        services.AddSingleton<IKafkaProducerPool>(sp =>
+            new KafkaProducerPool(
+                sp.GetRequiredService<IConfiguration>(),
+                sp.GetRequiredService<ILogger<KafkaProducerPool>>(),
+                poolSize: 5));  // Configurable pool size
+        
         services.AddScoped<IKafkaService, KafkaService>();
 
         // Add batch publishing handler for high-performance publish updates
