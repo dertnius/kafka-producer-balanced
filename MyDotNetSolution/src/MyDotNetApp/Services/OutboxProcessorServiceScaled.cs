@@ -133,6 +133,9 @@ public class OutboxProcessorServiceScaled : BackgroundService
     /// </summary>
     private async Task PollOutboxAsync(CancellationToken stoppingToken)
     {
+        int currentPollingDelayMs = _kafkaSettings.PollingIntervalMs;
+        int consecutiveEmptyPolls = 0;
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
@@ -141,9 +144,26 @@ public class OutboxProcessorServiceScaled : BackgroundService
                 
                 if (messages.Count == 0)
                 {
-                    await Task.Delay(_kafkaSettings.PollingIntervalMs, stoppingToken);
+                    consecutiveEmptyPolls++;
+                    
+                    // Adaptive backoff: increase delay when idle
+                    if (_kafkaSettings.EnableAdaptiveBackoff && consecutiveEmptyPolls > 1)
+                    {
+                        currentPollingDelayMs = (int)Math.Min(
+                            currentPollingDelayMs * _kafkaSettings.BackoffMultiplier,
+                            _kafkaSettings.MaxPollingIntervalMs);
+                        
+                        _logger.LogDebug("No messages found. Adaptive backoff: polling delay increased to {DelayMs}ms", 
+                            currentPollingDelayMs);
+                    }
+
+                    await Task.Delay(currentPollingDelayMs, stoppingToken);
                     continue;
                 }
+
+                // Reset to fast polling when work is found
+                consecutiveEmptyPolls = 0;
+                currentPollingDelayMs = _kafkaSettings.PollingIntervalMs;
 
                 _logger.LogDebug("Fetched {MessageCount} messages from outbox", messages.Count);
                 _metrics.RecordFetched(messages.Count);
