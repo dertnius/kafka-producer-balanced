@@ -1,0 +1,246 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Dapper;
+using Microsoft.Extensions.Logging;
+
+namespace MyDotNetApp.Services
+{
+    public interface IOutboxService
+    {
+        Task<List<OutboxItem>> GetPendingOutboxItemsAsync(int offset, int batchSize, CancellationToken cancellationToken);
+        Task ProcessEmptyCodeMessageAsync(OutboxItem item, CancellationToken cancellationToken);
+        Task MarkMessageAsProcessedAsync(long id, CancellationToken cancellationToken);
+        Task HandleFailedMessageAsync(OutboxItem item, string errorCode, string errorMessage, CancellationToken cancellationToken);
+        Task MarkStidAsNotPublishedAsync(string stid, CancellationToken cancellationToken);
+        Task MarkMessageAsPublishedAsync(long id, CancellationToken cancellationToken);
+        Task MarkMessagesAsPublishedBatchAsync(List<long> messageIds, CancellationToken cancellationToken);
+        Task MarkMessageAsProducedAsync(long id, DateTime producedAt, CancellationToken cancellationToken);
+        Task MarkMessageAsReceivedAsync(long id, DateTime receivedAt, CancellationToken cancellationToken);
+    }
+
+    public class OutboxService : IOutboxService
+    {
+        private readonly IDbConnection _dbConnection;
+        private readonly ILogger<OutboxService> _logger;
+
+        public OutboxService(IDbConnection dbConnection, ILogger<OutboxService> logger)
+        {
+            _dbConnection = dbConnection ?? throw new System.ArgumentNullException(nameof(dbConnection));
+            _logger = logger ?? throw new System.ArgumentNullException(nameof(logger));
+        }
+
+        public async Task<List<OutboxItem>> GetPendingOutboxItemsAsync(int offset, int batchSize, CancellationToken cancellationToken)
+        {
+            try
+            {
+                var query = @"
+                    SELECT Id, Stid, Code, Rank, Processed, Retry, ErrorCode 
+                    FROM Outbox WITH (NOLOCK)
+                    WHERE Processed = 0 AND (Retry = 0 OR (Retry <> 0 AND ErrorCode IS NULL)) 
+                    AND (Code IS NULL OR EXISTS (
+                        SELECT 1 FROM Outbox AS o2 
+                        WHERE o2.Stid = Outbox.Stid 
+                        AND o2.Code IS NULL 
+                        AND o2.Processed = 1
+                    ))
+                    ORDER BY Stid, CASE WHEN Code IS NULL THEN 0 ELSE 1 END, Id 
+                    OFFSET @Offset ROWS FETCH NEXT @BatchSize ROWS ONLY";
+
+                var result = await _dbConnection.QueryAsync<OutboxItem>(
+                    query,
+                    new { Offset = offset, BatchSize = batchSize });
+
+                return result.ToList();
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving pending outbox items with offset {Offset}, batchSize {BatchSize}", offset, batchSize);
+                throw;
+            }
+        }
+
+        public async Task ProcessEmptyCodeMessageAsync(OutboxItem item, CancellationToken cancellationToken)
+        {
+            if (item == null)
+                throw new System.ArgumentNullException(nameof(item));
+
+            try
+            {
+                _logger.LogInformation("Processing empty Code message with ID: {Id}, Stid: {Stid}", item.Id, item.Stid);
+
+                await _dbConnection.ExecuteAsync(
+                    "UPDATE SomeTable SET Processed = 1 WHERE Id = @Id",
+                    new { Id = item.Id });
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "Error processing empty code message for ID {Id}", item.Id);
+                throw;
+            }
+        }
+
+        public async Task MarkMessageAsProcessedAsync(long id, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _dbConnection.ExecuteAsync(
+                    "UPDATE Outbox SET Processed = 1, Retry = 0, ErrorCode = NULL WHERE Id = @Id",
+                    new { Id = id });
+                
+                _logger.LogDebug("Message {MessageId} marked as processed", id);
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "Error marking message {MessageId} as processed", id);
+                throw;
+            }
+        }
+
+        public async Task HandleFailedMessageAsync(OutboxItem item, string errorCode, string errorMessage, CancellationToken cancellationToken)
+        {
+            if (item == null)
+                throw new System.ArgumentNullException(nameof(item));
+
+            if (string.IsNullOrWhiteSpace(errorCode))
+                throw new System.ArgumentException("Error code cannot be null or empty", nameof(errorCode));
+
+            try
+            {
+                // Check retry count limit
+                if (item.Retry >= 5) // Max 5 retries
+                {
+                    _logger.LogError("Message {MessageId} exceeded maximum retry attempts ({RetryCount}). ErrorCode: {ErrorCode}, Error: {ErrorMessage}",
+                        item.Id, item.Retry, errorCode, errorMessage);
+                    
+                    await _dbConnection.ExecuteAsync(
+                        "UPDATE Outbox SET Processed = -1 WHERE Id = @Id",
+                        new { Id = item.Id });
+                }
+                else
+                {
+                    await _dbConnection.ExecuteAsync(
+                        "UPDATE Outbox SET Retry = Retry + 1, ErrorCode = @ErrorCode WHERE Id = @Id",
+                        new { Id = item.Id, ErrorCode = errorCode });
+
+                    _logger.LogWarning("Message {MessageId} failed. Retry count: {RetryCount}. ErrorCode: {ErrorCode}, Error: {ErrorMessage}",
+                        item.Id, item.Retry + 1, errorCode, errorMessage);
+                }
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "Error handling failed message {MessageId}", item.Id);
+                throw;
+            }
+        }
+
+        public async Task MarkStidAsNotPublishedAsync(string stid, CancellationToken cancellationToken)
+        {
+            if (string.IsNullOrWhiteSpace(stid))
+                throw new System.ArgumentException("Stid cannot be null or empty", nameof(stid));
+
+            try
+            {
+                await _dbConnection.ExecuteAsync(
+                    "UPDATE Outbox SET Processed = -1 WHERE Stid = @Stid",
+                    new { Stid = stid });
+
+                _logger.LogInformation("All records for Stid: {Stid} have been marked as not published", stid);
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "Error marking Stid {Stid} as not published", stid);
+                throw;
+            }
+        }
+
+        public async Task MarkMessageAsPublishedAsync(long id, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _dbConnection.ExecuteAsync(
+                    "UPDATE Outbox SET Publish = 1 WHERE Id = @Id",
+                    new { Id = id });
+
+                _logger.LogDebug("Message {MessageId} marked as published", id);
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "Error marking message {MessageId} as published", id);
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// High-performance batch update for marking multiple messages as published
+        /// Uses parameterized IN clause for SQL injection protection
+        /// </summary>
+        public async Task MarkMessagesAsPublishedBatchAsync(List<long> messageIds, CancellationToken cancellationToken)
+        {
+            if (messageIds == null || messageIds.Count == 0)
+                return;
+
+            try
+            {
+                // Build parameterized query for batch update
+                var parameters = messageIds.Select((id, index) => $"@Id{index}").ToList();
+                var sql = $@"
+                    UPDATE Outbox
+                    SET Publish = 1
+                    WHERE Id IN ({string.Join(",", parameters)})";
+
+                var dynamicParams = new DynamicParameters();
+                for (int i = 0; i < messageIds.Count; i++)
+                {
+                    dynamicParams.Add($"@Id{i}", messageIds[i]);
+                }
+
+                var rowsAffected = await _dbConnection.ExecuteAsync(sql, dynamicParams);
+
+                _logger.LogDebug("Batch marked {RowCount} messages as published", rowsAffected);
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "Error batch marking {MessageCount} messages as published", messageIds.Count);
+                throw;
+            }
+        }
+
+        public async Task MarkMessageAsProducedAsync(long id, DateTime producedAt, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _dbConnection.ExecuteAsync(
+                    "UPDATE Outbox SET ProducedAt = @ProducedAt WHERE Id = @Id",
+                    new { Id = id, ProducedAt = producedAt });
+
+                _logger.LogDebug("Message {MessageId} marked as produced at {ProducedAt}", id, producedAt);
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "Error marking message {MessageId} as produced", id);
+                throw;
+            }
+        }
+
+        public async Task MarkMessageAsReceivedAsync(long id, DateTime receivedAt, CancellationToken cancellationToken)
+        {
+            try
+            {
+                await _dbConnection.ExecuteAsync(
+                    "UPDATE Outbox SET ReceivedAt = @ReceivedAt WHERE Id = @Id",
+                    new { Id = id, ReceivedAt = receivedAt });
+
+                _logger.LogDebug("Message {MessageId} marked as received at {ReceivedAt}", id, receivedAt);
+            }
+            catch (System.Exception ex)
+            {
+                _logger.LogError(ex, "Error marking message {MessageId} as received", id);
+                throw;
+            }
+        }
+    }
+}
