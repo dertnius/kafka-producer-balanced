@@ -1,0 +1,54 @@
+# Build outputs
+bin/
+obj/
+[Test]*/bin/
+[Test]*/obj/
+
+# VS tooling
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# VS Code
+.vscode/
+
+# Test results
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+project.lock.json
+project.assets.json
+*.nuget.props
+*.nuget.targets
+
+# Logs and reports
+*.log
+*.tlog
+*.svclog
+test-output.txt
+
+# Resharper / Rider
+_ReSharper*/
+*.DotSettings.user
+
+# OS junk
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Publish artifacts
+*.publishsettings
+**/wwwroot/lib/
+
+# Generated files
+*.generated.cs
+*.g.cs
+*.g.i.cs
