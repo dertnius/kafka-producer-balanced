@@ -5,6 +5,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using MyDotNetApp.Models;
 using MyDotNetApp.Services;
 using System.Data;
 using Microsoft.Data.SqlClient;
@@ -59,8 +61,27 @@ public class Startup
                 batchSize,
                 flushIntervalMs));
 
-        // Register flush background service
+        // Register flush background service for publish status updates
         services.AddHostedService<PublishFlushBackgroundService>();
+
+        // Configure Kafka settings
+        services.Configure<KafkaOutboxSettings>(Configuration.GetSection("KafkaOutboxSettings"));
+
+        // Register outbox processor background service
+        services.AddHostedService(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<OutboxProcessorServiceScaled>>();
+            var settings = sp.GetRequiredService<IOptions<KafkaOutboxSettings>>();
+            var kafkaService = sp.GetRequiredService<IKafkaService>();
+            var publishBatchHandler = sp.GetRequiredService<IPublishBatchHandler>();
+
+            return new OutboxProcessorServiceScaled(
+                logger,
+                settings,
+                connectionString,
+                kafkaService,
+                publishBatchHandler);
+        });
     }
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILogger<Startup> logger)

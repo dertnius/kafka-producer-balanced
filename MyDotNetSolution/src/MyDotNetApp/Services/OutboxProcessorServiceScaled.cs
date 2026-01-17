@@ -27,14 +27,13 @@ public class OutboxProcessorServiceScaled : BackgroundService
     private readonly ILogger<OutboxProcessorServiceScaled> _logger;
     private readonly string _connectionString;
     private readonly KafkaOutboxSettings _kafkaSettings;
-    private readonly List<IProducer<string, byte[]>> _producers;
+    private readonly IKafkaService _kafkaService;
+    private readonly IPublishBatchHandler _publishBatchHandler;
     private readonly ISchemaRegistryClient _schemaRegistryClient;
     private readonly IAsyncSerializer<GenericRecord> _avroSerializer;
     private readonly RecordSchema _outboxSchema;
-    private int _producerRoundRobin = 0;
     
     private readonly Channel<OutboxMessage> _processingChannel;
-    private readonly Channel<long> _producedMessageIdsChannel;  // NEW: Track successfully produced messages
     private readonly ConcurrentBag<Task> _backgroundTasks;
     private readonly SemaphoreSlim _databaseSemaphore;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _mortgageStidLocks;
@@ -43,13 +42,16 @@ public class OutboxProcessorServiceScaled : BackgroundService
     public OutboxProcessorServiceScaled(
         ILogger<OutboxProcessorServiceScaled> logger,
         IOptions<KafkaOutboxSettings> kafkaSettings,
-        string connectionString)
+        string connectionString,
+        IKafkaService kafkaService,
+        IPublishBatchHandler publishBatchHandler)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _kafkaSettings = kafkaSettings?.Value ?? throw new ArgumentNullException(nameof(kafkaSettings));
         _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
+        _kafkaService = kafkaService ?? throw new ArgumentNullException(nameof(kafkaService));
+        _publishBatchHandler = publishBatchHandler ?? throw new ArgumentNullException(nameof(publishBatchHandler));
         
-        _producers = new List<IProducer<string, byte[]>>(_kafkaSettings.MaxConcurrentProducers);
         _backgroundTasks = new ConcurrentBag<Task>();
         _databaseSemaphore = new SemaphoreSlim(_kafkaSettings.DatabaseConnectionPoolSize);
         _mortgageStidLocks = new ConcurrentDictionary<string, SemaphoreSlim>();
@@ -58,9 +60,6 @@ public class OutboxProcessorServiceScaled : BackgroundService
             {
                 FullMode = BoundedChannelFullMode.Wait
             });
-        // Channel for tracking successfully produced message IDs
-        _producedMessageIdsChannel = Channel.CreateUnbounded<long>(
-            new UnboundedChannelOptions { SingleReader = false, SingleWriter = false });
         _metrics = new PerformanceMetrics();
 
         if (string.IsNullOrWhiteSpace(_kafkaSettings.SchemaRegistryUrl))
@@ -102,17 +101,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting Scaled Kafka Outbox Processor Service");
-        
-        try
-        {
-            InitializeKafkaProducers();
-            await base.StartAsync(cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error starting Scaled Kafka Outbox Processor Service");
-            throw;
-        }
+        await base.StartAsync(cancellationToken);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -122,10 +111,9 @@ public class OutboxProcessorServiceScaled : BackgroundService
         // Start background tasks
         var pollingTask = PollOutboxAsync(stoppingToken);
         var producingTask = ProduceMessagesAsync(stoppingToken);
-        var markingTask = MarkMessagesAsPublishedAsync(stoppingToken);
         var metricsTask = ReportMetricsAsync(stoppingToken);
 
-        await Task.WhenAll(pollingTask, producingTask, markingTask, metricsTask);
+        await Task.WhenAll(pollingTask, producingTask, metricsTask);
     }
 
     /// <summary>
@@ -220,8 +208,8 @@ public class OutboxProcessorServiceScaled : BackgroundService
                     await SendMessageToKafkaAsync(message, stoppingToken);
                     _metrics.RecordProduced();
                     
-                    // Send successfully produced message ID to the marking channel
-                    await _producedMessageIdsChannel.Writer.WriteAsync(message.Id, stoppingToken);
+                    // Enqueue for batch publish status update
+                    await _publishBatchHandler.EnqueueForPublishAsync(message.Id, stoppingToken);
                 }
                 finally
                 {
@@ -240,45 +228,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
         }
     }
 
-    /// <summary>
-    /// Task 3: Mark messages as published in batches (batched updates are faster)
-    /// </summary>
-    private async Task MarkMessagesAsPublishedAsync(CancellationToken stoppingToken)
-    {
-        var batch = new List<long>(10000);
-        var timer = Stopwatch.StartNew();
-        const int batchFlushIntervalMs = 1000; // Flush every 1 second
 
-        try
-        {
-            await foreach (var messageId in _producedMessageIdsChannel.Reader.ReadAllAsync(stoppingToken))
-            {
-                batch.Add(messageId);
-                
-                // Flush batch when it reaches 10,000 items or every 1 second
-                if (batch.Count >= 10000 || (timer.ElapsedMilliseconds > batchFlushIntervalMs && batch.Count > 0))
-                {
-                    await MarkBatchAsPublishedAsync(batch, stoppingToken);
-                    _metrics.RecordMarked(batch.Count);
-                    batch.Clear();
-                    timer.Restart();
-                }
-            }
-        }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-        {
-            // Flush remaining batch on cancellation
-            if (batch.Count > 0)
-            {
-                await MarkBatchAsPublishedAsync(batch, stoppingToken);
-                _metrics.RecordMarked(batch.Count);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error marking messages as published");
-        }
-    }
 
     /// <summary>
     /// Report performance metrics every 10 seconds
@@ -356,44 +306,22 @@ public class OutboxProcessorServiceScaled : BackgroundService
     {
         try
         {
-            // Round-robin through producers for load balancing
-            var producer = _producers[Interlocked.Increment(ref _producerRoundRobin) % _producers.Count];
-
-            // Build Avro GenericRecord
-            var record = new GenericRecord(_outboxSchema);
-            record.Add("Id", message.Id);
-            record.Add("AggregateId", message.AggregateId);
-            record.Add("EventType", message.EventType);
-            record.Add("Rank", message.Rank);
-            record.Add("SecType", message.SecType);
-            record.Add("Domain", message.Domain);
-            record.Add("MortgageStid", message.MortgageStid);
-            record.Add("SecPoolCode", message.SecPoolCode);
-            record.Add("Publish", message.Publish);
-            record.Add("ProducedAt", ToUnixMillis(message.ProducedAt));
-            record.Add("ReceivedAt", ToUnixMillis(message.ReceivedAt));
-            record.Add("Processed", message.Processed);
-            record.Add("CreatedAt", ToUnixMillis(message.CreatedAt));
-            record.Add("ProcessedAt", ToUnixMillis(message.ProcessedAt));
-
-            var avroBytes = await _avroSerializer.SerializeAsync(
-                record,
-                new SerializationContext(MessageComponentType.Value, _kafkaSettings.TopicName));
-
-            var kafkaMessage = new Message<string, byte[]>
+            // Convert OutboxMessage to OutboxItem for KafkaService
+            var outboxItem = new OutboxItem
             {
-                Key = message.MortgageStid ?? string.Empty,
-                Value = avroBytes,
-                Headers = new Headers
-                {
-                    { "event-type", Encoding.UTF8.GetBytes(message.EventType ?? string.Empty) }
-                }
+                Id = message.Id,
+                Stid = message.MortgageStid,
+                Code = message.SecPoolCode,
+                Rank = message.Rank ?? 0,
+                Processed = message.Processed,
+                Retry = 0,
+                ErrorCode = null
             };
 
-            await producer.ProduceAsync(
-                _kafkaSettings.TopicName,
-                kafkaMessage,
-                stoppingToken);
+            // Use KafkaService to produce the message
+            await _kafkaService.ProduceMessageAsync(outboxItem, stoppingToken);
+
+            _logger.LogDebug("Message {MessageId} produced to Kafka via KafkaService", message.Id);
         }
         catch (Exception ex)
         {
@@ -447,60 +375,13 @@ public class OutboxProcessorServiceScaled : BackgroundService
         }
     }
 
-    private void InitializeKafkaProducers()
-    {
-        var producerConfig = new ProducerConfig
-        {
-            BootstrapServers = _kafkaSettings.BootstrapServers,
-            Acks = Acks.Leader,
-            CompressionType = CompressionType.Snappy,
-            RetryBackoffMs = 50,
-            MessageSendMaxRetries = 2,
-            SocketKeepaliveEnable = true,
-            SocketNagleDisable = true,  // Disable Nagle for lower latency
-            LingerMs = 10,  // Reduced from 100ms for faster flushing at high throughput
-            BatchSize = 1000000,  // 1MB batches
-            QueueBufferingMaxMessages = 200000,  // Increased from 100k for burst capacity
-            RequestTimeoutMs = 30000,
-            DeliveryReportFields = "none"  // Skip delivery reports if not needed for speed
-        };
 
-        for (int i = 0; i < _kafkaSettings.MaxConcurrentProducers; i++)
-        {
-            var producer = new ProducerBuilder<string, byte[]>(producerConfig)
-                .SetErrorHandler((_, error) =>
-                {
-                    _logger.LogError("Kafka producer error: {Error}", error.Reason);
-                })
-                .Build();
-
-            _producers.Add(producer);
-        }
-
-        _logger.LogInformation("Initialized {ProducerCount} Kafka producers", _producers.Count);
-    }
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Stopping Scaled Kafka Outbox Processor Service");
         _metrics.LogMetrics(_logger);
         
-        // Signal that no more messages will be produced
-        _producedMessageIdsChannel.Writer.Complete();
-        
-        try
-        {
-            foreach (var producer in _producers)
-            {
-                producer?.Flush(TimeSpan.FromSeconds(30));
-                producer?.Dispose();
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error flushing/disposing Kafka producers");
-        }
-
         await base.StopAsync(cancellationToken);
     }
 
@@ -508,12 +389,6 @@ public class OutboxProcessorServiceScaled : BackgroundService
     {
         _databaseSemaphore?.Dispose();
         _processingChannel?.Writer.Complete();
-        _producedMessageIdsChannel?.Writer.Complete();  // Complete the channel
-        
-        foreach (var producer in _producers)
-        {
-            producer?.Dispose();
-        }
         
         // Dispose all MortgageStid locks
         foreach (var kvp in _mortgageStidLocks)
