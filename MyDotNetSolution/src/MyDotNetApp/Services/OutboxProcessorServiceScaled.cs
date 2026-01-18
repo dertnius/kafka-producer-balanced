@@ -524,7 +524,8 @@ public class OutboxProcessorServiceScaled : BackgroundService
     private async Task CleanupStidLocksAsync(CancellationToken stoppingToken)
     {
         const int cleanupIntervalMs = 60000; // 60s
-        const long idleThresholdMs = 120000; // 120s (2 minutes)
+        const long idleThresholdMs = 120000; // 120s (2 minutes) - STID locks
+        const long stuckMessageThresholdMs = 1800000; // 1800s (30 minutes) - safety net only
         
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -552,6 +553,29 @@ public class OutboxProcessorServiceScaled : BackgroundService
                     }
                 }
                 
+                // SAFETY NET: Remove truly stuck messages (should never happen in normal operation)
+                // Messages are removed immediately on success/failure, so only a worker hang would leave them
+                var stuckCount = 0;
+                foreach (var kvp in _inFlightMessages.ToArray())
+                {
+                    var messageId = kvp.Key;
+                    var addedTime = kvp.Value;
+                    var ageMs = now - addedTime;
+                    
+                    // 30 minutes is long enough to avoid false positives during backlog
+                    // but will catch genuinely hung workers
+                    if (ageMs > stuckMessageThresholdMs)
+                    {
+                        if (_inFlightMessages.TryRemove(messageId, out _))
+                        {
+                            stuckCount++;
+                            _logger.LogError(
+                                "Removed stuck message {MessageId} from in-flight tracking (age: {AgeMinutes:F1} min) - possible worker hang",
+                                messageId, ageMs / 60000.0);
+                        }
+                    }
+                }
+                
                 // Log memory stats every cleanup cycle
                 var inFlightCount = _inFlightMessages.Count;
                 var stidLockCount = _mortgageStidLocks.Count;
@@ -561,14 +585,22 @@ public class OutboxProcessorServiceScaled : BackgroundService
                     _logger.LogInformation("Cleaned up {RemovedLocks} idle STID locks", removedLocks);
                 }
                 
+                if (stuckCount > 0)
+                {
+                    _logger.LogError("ALERT: Cleaned up {StuckCount} stuck messages - investigate worker health", stuckCount);
+                }
+                
+                // Alert if in-flight count is abnormally high
+                if (inFlightCount > 50000)
+                {
+                    _logger.LogWarning(
+                        "High in-flight message count: {InFlightCount} (channel backlog or slow processing)",
+                        inFlightCount);
+                }
+                
                 _logger.LogDebug(
                     "Memory stats: {InFlightCount} in-flight messages, {StidLockCount} STID locks",
                     inFlightCount, stidLockCount);
-                    
-                // WARNING: Do NOT clean up _inFlightMessages by time!
-                // Messages can legitimately wait in channel during backlog.
-                // They are removed when processed (success or failure).
-                // Only a crash or app restart should clear in-flight tracking.
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
