@@ -32,6 +32,7 @@ namespace MyDotNetApp.Services
         private readonly int _flushIntervalMs;
         private readonly int _instanceId;
         private IConsumer<string, string>? _consumer;
+        private TopicPartitionOffset _lastProcessedOffset = null!; // Track offset for manual commit
 
         public OutboxConsumerService(
             ILogger<OutboxConsumerService> logger,
@@ -60,7 +61,7 @@ namespace MyDotNetApp.Services
                 InitializeConsumer();
                 
                 // Batch accumulator with optimized capacity
-                var messageBatch = new List<(long MessageId, DateTime ReceivedAt)>(_batchSize * 2);
+                var messageBatch = new List<(long MessageId, DateTime ReceivedAt, TopicPartitionOffset Offset)>(_batchSize * 2);
                 var batchStopwatch = Stopwatch.StartNew();
                 long totalConsumed = 0;
                 long totalBatches = 0;
@@ -80,7 +81,8 @@ namespace MyDotNetApp.Services
                                 var messageId = ExtractMessageId(consumeResult.Message.Value);
                                 if (messageId > 0)
                                 {
-                                    messageBatch.Add((messageId, DateTime.UtcNow));
+                                    messageBatch.Add((messageId, DateTime.UtcNow, consumeResult.TopicPartitionOffset));
+                                    _lastProcessedOffset = consumeResult.TopicPartitionOffset;
                                     totalConsumed++;
                                 }
                             }
@@ -97,6 +99,11 @@ namespace MyDotNetApp.Services
                         if (shouldFlush)
                         {
                             await FlushBatchAsync(messageBatch, stoppingToken);
+                            // Commit offset only after successful DB flush
+                            if (_lastProcessedOffset.Offset.Value >= 0)
+                            {
+                                _consumer!.Commit(new[] { _lastProcessedOffset });
+                            }
                             totalBatches++;
                             messageBatch.Clear();
                             batchStopwatch.Restart();
@@ -129,6 +136,11 @@ namespace MyDotNetApp.Services
                             try
                             {
                                 await FlushBatchAsync(messageBatch, stoppingToken);
+                                // Commit offset only after successful DB flush
+                                if (_lastProcessedOffset.Offset.Value >= 0)
+                                {
+                                    _consumer!.Commit(new[] { _lastProcessedOffset });
+                                }
                                 messageBatch.Clear();
                             }
                             catch (Exception flushEx)
@@ -155,6 +167,11 @@ namespace MyDotNetApp.Services
                     try
                     {
                         await FlushBatchAsync(messageBatch, stoppingToken);
+                        // Commit offset only after successful DB flush
+                        if (_lastProcessedOffset.Offset.Value >= 0)
+                        {
+                            _consumer!.Commit(new[] { _lastProcessedOffset });
+                        }
                     }
                     catch (OperationCanceledException)
                     {
@@ -188,8 +205,7 @@ namespace MyDotNetApp.Services
                     BootstrapServers = _kafkaSettings.BootstrapServers,
                     GroupId = _consumerGroupId,
                     AutoOffsetReset = AutoOffsetReset.Earliest,
-                    EnableAutoCommit = true,
-                    AutoCommitIntervalMs = 2000,           // Commit more frequently for safety
+                    EnableAutoCommit = false,              // Manual commit after DB flush ensures ordering
                     SessionTimeoutMs = 30000,
                     MaxPollIntervalMs = 300000,
                     
@@ -235,7 +251,7 @@ namespace MyDotNetApp.Services
         /// Flushes accumulated batch of messages to the database in a single operation
         /// This minimizes table locking and improves throughput for high-volume scenarios
         /// </summary>
-        private async Task FlushBatchAsync(List<(long MessageId, DateTime ReceivedAt)> messageBatch, CancellationToken stoppingToken)
+        private async Task FlushBatchAsync(List<(long MessageId, DateTime ReceivedAt, TopicPartitionOffset Offset)> messageBatch, CancellationToken stoppingToken)
         {
             if (messageBatch == null || messageBatch.Count == 0)
             {
