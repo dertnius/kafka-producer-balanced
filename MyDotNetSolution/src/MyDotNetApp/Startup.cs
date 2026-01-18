@@ -80,8 +80,8 @@ public class Startup
         // Configure Kafka settings
         services.Configure<KafkaOutboxSettings>(Configuration.GetSection("KafkaOutboxSettings"));
 
-        // Register outbox processor background service
-        services.AddHostedService(sp =>
+        // Register outbox processor as a singleton so API/manual triggers reach the running instance
+        services.AddSingleton<OutboxProcessorServiceScaled>(sp =>
         {
             var logger = sp.GetRequiredService<ILogger<OutboxProcessorServiceScaled>>();
             var settings = sp.GetRequiredService<IOptions<KafkaOutboxSettings>>();
@@ -95,6 +95,9 @@ public class Startup
                 kafkaService,
                 publishBatchHandler);
         });
+
+        // Reuse the same singleton for the hosted background service
+        services.AddHostedService(sp => sp.GetRequiredService<OutboxProcessorServiceScaled>());
 
         // Register multiple outbox consumer background services for parallel processing
         // All consumers share the same consumer group, Kafka distributes partitions among them
