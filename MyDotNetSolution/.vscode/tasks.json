@@ -37,7 +37,7 @@
     {
       "label": "Test: Detailed Output",
       "type": "shell",
-      "command": "dotnet test --no-build --logger \"console;verbosity=detailed\"",
+      "command": "dotnet test --no-build --logger 'console;verbosity=detailed'",
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -48,7 +48,7 @@
     {
       "label": "Test: Minimal Output",
       "type": "shell",
-      "command": "dotnet test --no-build --logger \"console;verbosity=minimal\"",
+      "command": "dotnet test --no-build --logger 'console;verbosity=minimal'",
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -59,7 +59,7 @@
     {
       "label": "Test: Quiet Output",
       "type": "shell",
-      "command": "dotnet test --no-build --logger \"console;verbosity=quiet\"",
+      "command": "dotnet test --no-build --logger 'console;verbosity=quiet'",
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -158,7 +158,7 @@
     {
       "label": "Test: Save Results to File",
       "type": "shell",
-      "command": "dotnet test --no-build --logger \"console;verbosity=detailed\" > test-results-$(Get-Date -Format 'yyyyMMdd-HHmmss').txt",
+      "command": "dotnet test --no-build --logger 'console;verbosity=detailed' > test-results-$(Get-Date -Format 'yyyyMMdd-HHmmss').txt",
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -169,7 +169,7 @@
     {
       "label": "Test: Show Timing Summary",
       "type": "shell",
-      "command": "dotnet test --no-build --logger \"console;verbosity=detailed\" | Select-String '(Passed|Failed|Skipped).*\\[.*ms\\]'",
+      "command": "dotnet test --no-build --logger 'console;verbosity=detailed' | Select-String '(Passed|Failed|Skipped).*\\[.*ms\\]'",
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -180,7 +180,7 @@
     {
       "label": "Test: Show Only Passed Tests",
       "type": "shell",
-      "command": "dotnet test --no-build --logger \"console;verbosity=detailed\" | Select-String 'Passed'",
+      "command": "dotnet test --no-build --logger 'console;verbosity=detailed' | Select-String 'Passed'",
       "group": "test",
       "presentation": {
         "reveal": "always",
@@ -191,7 +191,7 @@
     {
       "label": "Test: Show Test Duration Stats",
       "type": "shell",
-      "command": "dotnet test --no-build --logger \"console;verbosity=detailed\" | Select-String 'Passed.*\\[\\d+ ms\\]' | ForEach-Object { [int]($_.Line -replace '.*\\[(\\d+)ms\\].*', '$1') } | Measure-Object -Average -Maximum -Minimum",
+      "command": "dotnet test --no-build --logger 'console;verbosity=detailed' | Select-String 'Passed.*\\[\\d+ ms\\]' | ForEach-Object { [int]($_.Line -replace '.*\\[(\\d+)ms\\].*', '$1') } | Measure-Object -Average -Maximum -Minimum",
       "group": "test",
       "presentation": {
         "reveal": "always",
