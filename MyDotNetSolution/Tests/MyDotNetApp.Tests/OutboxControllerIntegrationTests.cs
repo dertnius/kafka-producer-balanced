@@ -42,8 +42,7 @@ namespace MyDotNetApp.Tests
             var options = Options.Create(CreateSettings(pollingIntervalMs));
             var kafkaMock = new Mock<IKafkaService>();
             var publishMock = new Mock<IPublishBatchHandler>();
-            var lifetime = Mock.Of<IHostApplicationLifetime>();
-            return new TestableOutboxProcessor(logger, options, "Server=(localdb)\\MSSQLLocalDB;Integrated Security=true;", kafkaMock.Object, publishMock.Object, lifetime);
+            return new TestableOutboxProcessor(logger, options, "Server=(localdb)\\MSSQLLocalDB;Integrated Security=true;", kafkaMock.Object, publishMock.Object);
         }
 
         [Fact]
@@ -102,8 +101,7 @@ namespace MyDotNetApp.Tests
                 IOptions<KafkaOutboxSettings> kafkaSettings,
                 string connectionString,
                 IKafkaService kafkaService,
-                IPublishBatchHandler publishBatchHandler,
-                IHostApplicationLifetime lifetime) : base(logger, kafkaSettings, connectionString, kafkaService, publishBatchHandler, lifetime)
+                IPublishBatchHandler publishBatchHandler) : base(logger, kafkaSettings, connectionString, kafkaService, publishBatchHandler)
             {
             }
 
@@ -159,8 +157,7 @@ namespace MyDotNetApp.Tests
                         var kafkaService = sp.GetRequiredService<IKafkaService>();
                         var publishBatchHandler = sp.GetRequiredService<IPublishBatchHandler>();
                         var connectionString = context.Configuration.GetConnectionString("DefaultConnection")!;
-                        var lifetime = sp.GetRequiredService<IHostApplicationLifetime>();
-                        return new TestableOutboxProcessorSingleton(logger, settings, connectionString, kafkaService, publishBatchHandler, lifetime);
+                        return new TestableOutboxProcessorSingleton(logger, settings, connectionString, kafkaService, publishBatchHandler);
                     });
 
                     // Ensure the hosted service uses the same singleton instance
@@ -195,8 +192,7 @@ namespace MyDotNetApp.Tests
                 IOptions<KafkaOutboxSettings> kafkaSettings,
                 string connectionString,
                 IKafkaService kafkaService,
-                IPublishBatchHandler publishBatchHandler,
-                IHostApplicationLifetime lifetime) : base(logger, kafkaSettings, connectionString, kafkaService, publishBatchHandler, lifetime)
+                IPublishBatchHandler publishBatchHandler) : base(logger, kafkaSettings, connectionString, kafkaService, publishBatchHandler)
             {
             }
 
