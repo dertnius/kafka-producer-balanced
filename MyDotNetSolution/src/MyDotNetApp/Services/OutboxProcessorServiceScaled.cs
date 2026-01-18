@@ -32,6 +32,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
     private readonly ISchemaRegistryClient _schemaRegistryClient;
     private readonly IAsyncSerializer<GenericRecord> _avroSerializer;
     private readonly RecordSchema _outboxSchema;
+    private readonly IHostApplicationLifetime _appLifetime;
     
     private readonly Channel<OutboxMessage> _processingChannel;
     private readonly ConcurrentBag<Task> _backgroundTasks;
@@ -51,13 +52,15 @@ public class OutboxProcessorServiceScaled : BackgroundService
         IOptions<KafkaOutboxSettings> kafkaSettings,
         string connectionString,
         IKafkaService kafkaService,
-        IPublishBatchHandler publishBatchHandler)
+        IPublishBatchHandler publishBatchHandler,
+        IHostApplicationLifetime appLifetime)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _kafkaSettings = kafkaSettings?.Value ?? throw new ArgumentNullException(nameof(kafkaSettings));
         _connectionString = connectionString ?? throw new ArgumentNullException(nameof(connectionString));
         _kafkaService = kafkaService ?? throw new ArgumentNullException(nameof(kafkaService));
         _publishBatchHandler = publishBatchHandler ?? throw new ArgumentNullException(nameof(publishBatchHandler));
+        _appLifetime = appLifetime ?? throw new ArgumentNullException(nameof(appLifetime));
         
         _backgroundTasks = new ConcurrentBag<Task>();
         _databaseSemaphore = new SemaphoreSlim(_kafkaSettings.DatabaseConnectionPoolSize);
@@ -117,6 +120,9 @@ public class OutboxProcessorServiceScaled : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Wait until the web app has fully started to avoid blocking startup
+        await WaitForAppStartedAsync(stoppingToken);
+
         _logger.LogInformation("OutboxProcessorServiceScaled is starting");
         _stoppingToken = stoppingToken;
         EnsureProcessingLoop();
@@ -125,6 +131,18 @@ public class OutboxProcessorServiceScaled : BackgroundService
         {
             await _processingTasks;
         }
+    }
+
+    private Task WaitForAppStartedAsync(CancellationToken stoppingToken)
+    {
+        if (_appLifetime.ApplicationStarted.IsCancellationRequested)
+        {
+            return Task.CompletedTask;
+        }
+
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _appLifetime.ApplicationStarted.Register(() => tcs.TrySetResult());
+        return tcs.Task.WaitAsync(stoppingToken);
     }
 
     private void EnsureProcessingLoop()

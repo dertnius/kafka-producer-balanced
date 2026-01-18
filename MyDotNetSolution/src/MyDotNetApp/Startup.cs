@@ -93,7 +93,8 @@ public class Startup
                 settings,
                 connectionString,
                 kafkaService,
-                publishBatchHandler);
+                publishBatchHandler,
+                sp.GetRequiredService<IHostApplicationLifetime>());
         });
 
         // Reuse the same singleton for the hosted background service

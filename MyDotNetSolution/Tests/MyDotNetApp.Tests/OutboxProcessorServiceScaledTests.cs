@@ -4,6 +4,7 @@ using Confluent.SchemaRegistry.Serdes;
 using Dapper;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 using Moq;
 using MyDotNetApp.Models;
 using MyDotNetApp.Services;
@@ -23,6 +24,7 @@ namespace MyDotNetApp.Tests
         private readonly Mock<IOptions<KafkaOutboxSettings>> _optionsMock;
         private readonly Mock<IKafkaService> _kafkaServiceMock;
         private readonly Mock<IPublishBatchHandler> _publishBatchHandlerMock;
+        private readonly Mock<IHostApplicationLifetime> _lifetimeMock;
         private readonly KafkaOutboxSettings _kafkaSettings;
         private const string TestConnectionString = "Server=localhost;Database=test;";
 
@@ -31,6 +33,8 @@ namespace MyDotNetApp.Tests
             _loggerMock = new Mock<ILogger<OutboxProcessorServiceScaled>>();
             _kafkaServiceMock = new Mock<IKafkaService>();
             _publishBatchHandlerMock = new Mock<IPublishBatchHandler>();
+            _lifetimeMock = new Mock<IHostApplicationLifetime>();
+            _lifetimeMock.Setup(l => l.ApplicationStarted).Returns(new CancellationToken(true));
             
             _kafkaSettings = new KafkaOutboxSettings
             {
@@ -57,7 +61,8 @@ namespace MyDotNetApp.Tests
                 _optionsMock.Object,
                 TestConnectionString,
                 _kafkaServiceMock.Object,
-                _publishBatchHandlerMock.Object);
+                _publishBatchHandlerMock.Object,
+                _lifetimeMock.Object);
 
             // Assert
             Assert.NotNull(service);
@@ -69,7 +74,7 @@ namespace MyDotNetApp.Tests
             // Act & Assert
             var ex = Assert.Throws<ArgumentNullException>(() =>
                 new OutboxProcessorServiceScaled(null!, _optionsMock.Object, TestConnectionString, 
-                    _kafkaServiceMock.Object, _publishBatchHandlerMock.Object));
+                    _kafkaServiceMock.Object, _publishBatchHandlerMock.Object, _lifetimeMock.Object));
             Assert.NotNull(ex);
         }
 
@@ -79,7 +84,7 @@ namespace MyDotNetApp.Tests
             // Act & Assert
             var ex = Assert.Throws<ArgumentNullException>(() =>
                 new OutboxProcessorServiceScaled(_loggerMock.Object, null!, TestConnectionString,
-                    _kafkaServiceMock.Object, _publishBatchHandlerMock.Object));
+                    _kafkaServiceMock.Object, _publishBatchHandlerMock.Object, _lifetimeMock.Object));
             Assert.NotNull(ex);
         }
 
@@ -89,7 +94,7 @@ namespace MyDotNetApp.Tests
             // Act & Assert
             var ex = Assert.Throws<ArgumentNullException>(() =>
                 new OutboxProcessorServiceScaled(_loggerMock.Object, _optionsMock.Object, null!,
-                    _kafkaServiceMock.Object, _publishBatchHandlerMock.Object));
+                    _kafkaServiceMock.Object, _publishBatchHandlerMock.Object, _lifetimeMock.Object));
             Assert.NotNull(ex);
         }
 
@@ -111,7 +116,7 @@ namespace MyDotNetApp.Tests
             // Act & Assert
             var ex = Assert.Throws<ArgumentNullException>(() =>
                 new OutboxProcessorServiceScaled(_loggerMock.Object, invalidOptionsMock.Object, TestConnectionString,
-                    _kafkaServiceMock.Object, _publishBatchHandlerMock.Object));
+                    _kafkaServiceMock.Object, _publishBatchHandlerMock.Object, _lifetimeMock.Object));
             Assert.NotNull(ex);
         }
 
@@ -124,7 +129,8 @@ namespace MyDotNetApp.Tests
                 _optionsMock.Object,
                 TestConnectionString,
                 _kafkaServiceMock.Object,
-                _publishBatchHandlerMock.Object);
+                _publishBatchHandlerMock.Object,
+                _lifetimeMock.Object);
 
             var cts = new CancellationTokenSource();
             cts.CancelAfter(100); // Cancel after 100ms to stop the service
@@ -159,7 +165,8 @@ namespace MyDotNetApp.Tests
                 _optionsMock.Object,
                 TestConnectionString,
                 _kafkaServiceMock.Object,
-                _publishBatchHandlerMock.Object);
+                _publishBatchHandlerMock.Object,
+                _lifetimeMock.Object);
 
             // Act
             await service.StartAsync(CancellationToken.None);
@@ -185,7 +192,8 @@ namespace MyDotNetApp.Tests
                 _optionsMock.Object,
                 TestConnectionString,
                 _kafkaServiceMock.Object,
-                _publishBatchHandlerMock.Object);
+                _publishBatchHandlerMock.Object,
+                _lifetimeMock.Object);
 
             // Act
             service.Dispose();
@@ -203,7 +211,8 @@ namespace MyDotNetApp.Tests
                 _optionsMock.Object,
                 TestConnectionString,
                 _kafkaServiceMock.Object,
-                _publishBatchHandlerMock.Object);
+                _publishBatchHandlerMock.Object,
+                _lifetimeMock.Object);
 
             // Act
             await service.StartAsync(CancellationToken.None);
