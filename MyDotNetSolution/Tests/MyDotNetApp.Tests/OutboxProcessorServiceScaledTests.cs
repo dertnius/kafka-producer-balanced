@@ -139,9 +139,9 @@ namespace MyDotNetApp.Tests
                     l => l.Log(
                         LogLevel.Information,
                         It.IsAny<EventId>(),
-                        It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Starting Scaled Kafka Outbox Processor Service")),
-                        It.IsAny<Exception>(),
-                        It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+                        It.Is<It.IsAnyType>((v, t) => ContainsMessage(v, "Starting Scaled Kafka Outbox Processor Service")),
+                        It.IsAny<Exception?>(),
+                        It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                     Times.Once);
             }
             finally
@@ -170,8 +170,8 @@ namespace MyDotNetApp.Tests
                 l => l.Log(
                     LogLevel.Information,
                     It.IsAny<EventId>(),
-                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Stopping Scaled Kafka Outbox Processor Service")),
-                    It.IsAny<Exception>(),
+                    It.Is<It.IsAnyType>((v, t) => ContainsMessage(v, "Stopping Scaled Kafka Outbox Processor Service")),
+                    It.IsAny<Exception?>(),
                     It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
                 Times.Once);
         }
@@ -274,7 +274,7 @@ namespace MyDotNetApp.Tests
         }
 
         [Fact]
-        public void PerformanceMetrics_ThreadSafety_HandlesConcurrentCalls()
+        public async Task PerformanceMetrics_ThreadSafety_HandlesConcurrentCalls()
         {
             // Arrange
             var metrics = new PerformanceMetrics();
@@ -291,11 +291,17 @@ namespace MyDotNetApp.Tests
                 }));
             }
 
-            Task.WaitAll(tasks.ToArray());
+            await Task.WhenAll(tasks);
 
             // Assert - no exception thrown
             var loggerMock = new Mock<ILogger>();
             metrics.LogMetrics(loggerMock.Object);
+        }
+
+        private static bool ContainsMessage(object value, string text)
+        {
+            var message = value?.ToString();
+            return !string.IsNullOrEmpty(message) && message.Contains(text, StringComparison.Ordinal);
         }
     }
 }

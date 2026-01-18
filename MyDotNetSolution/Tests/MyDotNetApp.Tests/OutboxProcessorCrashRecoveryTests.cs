@@ -25,7 +25,6 @@ namespace MyDotNetApp.Tests
         private readonly Mock<IKafkaService> _mockKafkaService;
         private readonly Mock<IPublishBatchHandler> _mockPublishBatchHandler;
         private readonly KafkaOutboxSettings _kafkaSettings;
-        private readonly string _connectionString = "Server=localhost;Database=TestDb;";
 
         public OutboxProcessorCrashRecoveryTests(ITestOutputHelper output)
         {
@@ -83,6 +82,7 @@ namespace MyDotNetApp.Tests
             // For this test, we verify the concept that ordering is based on DB query
             // which always returns messages ORDER BY Id
             Assert.True(true, "Ordering guaranteed by SQL query: WHERE rn = 1 ORDER BY Id");
+            await Task.CompletedTask; // Added await to remove CS1998 warning
             _output.WriteLine("✅ Crash recovery maintains ordering through database query");
         }
 
@@ -122,6 +122,7 @@ namespace MyDotNetApp.Tests
             Assert.Empty(instance2Messages); // In-flight tracking is reset
             Assert.True(instance2Messages.Count == 0, "After crash, in-flight dictionary is empty");
             
+            await Task.CompletedTask; // Added await to remove CS1998 warning
             _output.WriteLine("✅ In-flight tracking resets after crash, allowing reprocessing");
         }
 
@@ -179,6 +180,7 @@ namespace MyDotNetApp.Tests
             Assert.Equal(1, expectedResults[0].Id); // ABC: oldest is 1
             Assert.Equal(4, expectedResults[1].Id); // DEF: oldest is 4
             
+            await Task.CompletedTask; // Added await to remove CS1998 warning
             _output.WriteLine($"✅ Query returns oldest message per STID: ABC={expectedResults[0].Id}, DEF={expectedResults[1].Id}");
         }
 
@@ -226,6 +228,7 @@ namespace MyDotNetApp.Tests
             Assert.Equal(2, attemptCount[1]); // Message 1 sent twice (duplicate)
             Assert.Equal(1, attemptCount[2]); // Message 2 sent once
             
+            await Task.CompletedTask; // Added await to remove CS1998 warning
             _output.WriteLine("✅ Duplicate sent in correct order: [1, 1(dup), 2]");
         }
 

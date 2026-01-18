@@ -33,7 +33,7 @@ namespace MyDotNetApp.Tests
                 DatabaseConnectionPoolSize = 10
             };
 
-            var configDict = new Dictionary<string, string>
+            var configDict = new Dictionary<string, string?>
             {
                 ["Processing:PollIntervalMs"] = "5000",
                 ["Consumer:BatchSize"] = "5000",
@@ -74,7 +74,7 @@ namespace MyDotNetApp.Tests
             optionsMock.Setup(o => o.Value).Returns(_kafkaSettings);
 
             Assert.Throws<ArgumentNullException>(() =>
-                new OutboxConsumerService(null, outboxServiceMock.Object, _configuration, optionsMock.Object));
+                new OutboxConsumerService(null!, outboxServiceMock.Object, _configuration, optionsMock.Object));
         }
 
         [Fact]
@@ -85,7 +85,7 @@ namespace MyDotNetApp.Tests
             optionsMock.Setup(o => o.Value).Returns(_kafkaSettings);
 
             Assert.Throws<ArgumentNullException>(() =>
-                new OutboxConsumerService(loggerMock.Object, null, _configuration, optionsMock.Object));
+                new OutboxConsumerService(loggerMock.Object, null!, _configuration, optionsMock.Object));
         }
 
         [Fact]
@@ -97,7 +97,7 @@ namespace MyDotNetApp.Tests
             optionsMock.Setup(o => o.Value).Returns(_kafkaSettings);
 
             Assert.Throws<ArgumentNullException>(() =>
-                new OutboxConsumerService(loggerMock.Object, outboxServiceMock.Object, null, optionsMock.Object));
+                new OutboxConsumerService(loggerMock.Object, outboxServiceMock.Object, null!, optionsMock.Object));
         }
 
         [Fact]
@@ -107,7 +107,7 @@ namespace MyDotNetApp.Tests
             var outboxServiceMock = new Mock<IOutboxService>();
 
             Assert.Throws<ArgumentNullException>(() =>
-                new OutboxConsumerService(loggerMock.Object, outboxServiceMock.Object, _configuration, null));
+                new OutboxConsumerService(loggerMock.Object, outboxServiceMock.Object, _configuration, null!));
         }
 
         [Fact]
@@ -214,13 +214,13 @@ namespace MyDotNetApp.Tests
         }
 
         [Fact]
-        public void StopAsync_WithCancellation_CompletesSuccessfully()
+        public async Task StopAsync_WithCancellation_CompletesSuccessfully()
         {
             var service = CreateService();
             var cts = new CancellationTokenSource();
 
             var task = service.StopAsync(cts.Token);
-            task.Wait(TimeSpan.FromSeconds(2));
+            await task;
             Assert.True(task.IsCompletedSuccessfully);
         }
 
@@ -258,9 +258,10 @@ namespace MyDotNetApp.Tests
                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance,
                 null,
                 new[] { typeof(string) },
-                null);
+                null) ?? throw new InvalidOperationException("ConvertHexStringToBytes not found");
 
-            return (byte[])method.Invoke(service, new object[] { hex });
+            var result = method.Invoke(service, new object[] { hex });
+            return (byte[])(result ?? Array.Empty<byte>());
         }
     }
 }

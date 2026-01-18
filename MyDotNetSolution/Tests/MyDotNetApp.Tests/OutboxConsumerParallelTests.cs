@@ -266,6 +266,7 @@ namespace MyDotNetApp.Tests
             Assert.Contains(0, processedPartitions);
             Assert.Contains(1, processedPartitions);
             Assert.Contains(2, processedPartitions);
+            await Task.CompletedTask;
         }
 
         [Fact]
