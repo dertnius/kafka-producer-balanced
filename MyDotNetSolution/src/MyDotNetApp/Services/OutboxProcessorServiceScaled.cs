@@ -125,12 +125,9 @@ public class OutboxProcessorServiceScaled : BackgroundService
 
         _logger.LogInformation("OutboxProcessorServiceScaled is starting");
         _stoppingToken = stoppingToken;
-        EnsureProcessingLoop();
-
-        if (_processingTasks != null)
-        {
-            await _processingTasks;
-        }
+        
+        // Run all background processing tasks until cancellation
+        await RunProcessingTasksAsync(stoppingToken);
     }
 
     private Task WaitForAppStartedAsync(CancellationToken stoppingToken)
