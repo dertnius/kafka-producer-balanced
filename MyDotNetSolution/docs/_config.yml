@@ -1,4 +1,0 @@
-# Minimal Jekyll config - don't process anything
-# Docsify is client-side only
-safe: true
-skip_some_rules: ['SC1091', 'SC1090']
