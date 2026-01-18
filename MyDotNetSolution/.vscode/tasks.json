@@ -1,0 +1,328 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build the Solution",
+      "type": "shell",
+      "command": "dotnet build",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "Test: Run All Tests",
+      "type": "shell",
+      "command": "dotnet test",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Run All (No Build)",
+      "type": "shell",
+      "command": "dotnet test --no-build",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Detailed Output",
+      "type": "shell",
+      "command": "dotnet test --no-build --logger \"console;verbosity=detailed\"",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Minimal Output",
+      "type": "shell",
+      "command": "dotnet test --no-build --logger \"console;verbosity=minimal\"",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Quiet Output",
+      "type": "shell",
+      "command": "dotnet test --no-build --logger \"console;verbosity=quiet\"",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: OutboxConsumer Only",
+      "type": "shell",
+      "command": "dotnet test --no-build --filter FullyQualifiedName~OutboxConsumer",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: OutboxConsumer Unit Tests",
+      "type": "shell",
+      "command": "dotnet test --no-build --filter FullyQualifiedName~OutboxConsumerServiceTests",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: OutboxConsumer Parallel Tests",
+      "type": "shell",
+      "command": "dotnet test --no-build --filter FullyQualifiedName~OutboxConsumerParallelTests",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Parallel Execution Test Only",
+      "type": "shell",
+      "command": "dotnet test --no-build --filter FullyQualifiedName~ParallelExecution_IsFasterThanSequential",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: List All Tests",
+      "type": "shell",
+      "command": "dotnet test --no-build --list-tests",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: List OutboxConsumer Tests",
+      "type": "shell",
+      "command": "dotnet test --no-build --list-tests | Select-String 'OutboxConsumer'",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Coverage with HTML Report",
+      "type": "shell",
+      "command": "dotnet test --no-build --collect:\"XPlat Code Coverage\" ; reportgenerator -reports:tests/MyDotNetApp.Tests/TestResults/**/coverage.cobertura.xml -targetdir:coverage-report -reporttypes:Html",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Report: Open Coverage HTML",
+      "type": "shell",
+      "command": "Invoke-Item coverage-report/index.html",
+      "group": "none",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Save Results to File",
+      "type": "shell",
+      "command": "dotnet test --no-build --logger \"console;verbosity=detailed\" > test-results-$(Get-Date -Format 'yyyyMMdd-HHmmss').txt",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Show Timing Summary",
+      "type": "shell",
+      "command": "dotnet test --no-build --logger \"console;verbosity=detailed\" | Select-String '(Passed|Failed|Skipped).*\\[.*ms\\]'",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Show Only Passed Tests",
+      "type": "shell",
+      "command": "dotnet test --no-build --logger \"console;verbosity=detailed\" | Select-String 'Passed'",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Show Test Duration Stats",
+      "type": "shell",
+      "command": "dotnet test --no-build --logger \"console;verbosity=detailed\" | Select-String 'Passed.*\\[\\d+ ms\\]' | ForEach-Object { [int]($_.Line -replace '.*\\[(\\d+)ms\\].*', '$1') } | Measure-Object -Average -Maximum -Minimum",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Find Slowest Tests",
+      "type": "shell",
+      "command": "dotnet test --no-build --logger \"console;verbosity=detailed\" | Select-String 'Passed.*\\[\\d+ ms\\]' | Sort-Object { [int]($_.Line -replace '.*\\[(\\d+)ms\\].*', '$1') } -Descending | Select-Object -First 10",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Parallel Tests Performance",
+      "type": "shell",
+      "command": "dotnet test --no-build --filter FullyQualifiedName~OutboxConsumerParallelTests --logger \"console;verbosity=detailed\" | Select-String '(Passed|Test run)'",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: OutboxController Integration",
+      "type": "shell",
+      "command": "dotnet test --no-build --filter FullyQualifiedName~OutboxControllerIntegrationTests",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: OutboxController Integration (Detailed)",
+      "type": "shell",
+      "command": "dotnet test --no-build --filter FullyQualifiedName~OutboxControllerIntegrationTests --logger \"console;verbosity=detailed\"",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Watch Mode (Continuous)",
+      "type": "shell",
+      "command": "dotnet watch test",
+      "isBackground": true,
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Build and Run All",
+      "type": "shell",
+      "command": "dotnet build && dotnet test --no-build --logger 'console;verbosity=detailed'",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "Analysis: Count Test Categories",
+      "type": "shell",
+      "command": "dotnet test --no-build --list-tests | Select-String 'OutboxConsumer|OutboxProcessor|HomeBackground' | Group-Object { $_ -replace '.*\\.([^.]+Tests)\\..*', '$1' } | Select-Object Count, Name",
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Analysis: Test Summary Report",
+      "type": "shell",
+      "command": "$output = dotnet test --no-build --logger \"console;verbosity=detailed\"; $passed = ($output | Select-String 'Passed').Count; $failed = ($output | Select-String 'Failed').Count; $total = ($output | Select-String 'Test run').Line -replace '.*Total tests: (\\d+).*', '$1'; Write-Host \"\\n=== TEST SUMMARY ===\"; Write-Host \"Total: $total\"; Write-Host \"Passed: $passed\"; Write-Host \"Failed: $failed\"; Write-Host \"===================\"; $output",
+      "group": "none",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Clean: Remove bin and obj",
+      "type": "shell",
+      "command": "dotnet clean",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Clean: Deep Clean (bin/obj folders)",
+      "type": "shell",
+      "command": "Get-ChildItem -Include bin,obj -Recurse -Force | Remove-Item -Force -Recurse",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Rebuild: Clean and Build",
+      "type": "shell",
+      "command": "dotnet clean && dotnet build",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": ["$msCompile"]
+    }
+  ]
+}
