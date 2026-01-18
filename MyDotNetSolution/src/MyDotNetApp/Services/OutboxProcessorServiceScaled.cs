@@ -38,6 +38,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
     private readonly SemaphoreSlim _databaseSemaphore;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _mortgageStidLocks;
     private readonly ConcurrentDictionary<string, long> _stidLastUsed;
+    private readonly ConcurrentDictionary<long, byte> _inFlightMessages; // Track messages already in channel/processing
     private PerformanceMetrics _metrics;
 
     public OutboxProcessorServiceScaled(
@@ -57,6 +58,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
         _databaseSemaphore = new SemaphoreSlim(_kafkaSettings.DatabaseConnectionPoolSize);
         _mortgageStidLocks = new ConcurrentDictionary<string, SemaphoreSlim>();
         _stidLastUsed = new ConcurrentDictionary<string, long>();
+        _inFlightMessages = new ConcurrentDictionary<long, byte>(); // byte is dummy value (minimal memory)
         _processingChannel = Channel.CreateBounded<OutboxMessage>(
             new BoundedChannelOptions(_kafkaSettings.MaxProducerBuffer)
             {
@@ -190,10 +192,28 @@ public class OutboxProcessorServiceScaled : BackgroundService
                     messages.Count, pollDuration.TotalMilliseconds);
                 _metrics.RecordFetched(messages.Count);
 
-                // Add messages to processing channel
+                // Add messages to processing channel, skipping duplicates already in-flight
+                int addedCount = 0;
+                int skippedCount = 0;
                 foreach (var message in messages)
                 {
-                    await _processingChannel.Writer.WriteAsync(message, stoppingToken);
+                    // Check if message is already in channel or being processed
+                    if (_inFlightMessages.TryAdd(message.Id, 0))
+                    {
+                        await _processingChannel.Writer.WriteAsync(message, stoppingToken);
+                        addedCount++;
+                    }
+                    else
+                    {
+                        skippedCount++;
+                        _logger.LogDebug("Skipped duplicate message {MessageId} already in flight", message.Id);
+                    }
+                }
+                
+                if (skippedCount > 0)
+                {
+                    _logger.LogInformation("Added {AddedCount} new messages, skipped {SkippedCount} duplicates already in channel", 
+                        addedCount, skippedCount);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -246,6 +266,17 @@ public class OutboxProcessorServiceScaled : BackgroundService
                     
                     // Enqueue for batch publish status update
                     await _publishBatchHandler.EnqueueForPublishAsync(message.Id, stoppingToken);
+                    
+                    // Success: Remove from in-flight tracking
+                    _inFlightMessages.TryRemove(message.Id, out _);
+                }
+                catch (Exception publishEx)
+                {
+                    // CRITICAL: Remove from in-flight so message can be re-polled
+                    _logger.LogError(publishEx, "Failed to publish message {MessageId}, will retry on next poll", message.Id);
+                    _inFlightMessages.TryRemove(message.Id, out _); // Allow retry
+                    _metrics.RecordFailed();
+                    throw; // Rethrow to be caught by outer catch
                 }
                 finally
                 {
@@ -259,7 +290,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error producing message {MessageId}", message.Id);
+                _logger.LogError(ex, "Error producing message {MessageId}, will retry on next poll", message.Id);
                 _metrics.RecordFailed();
             }
         }
@@ -353,18 +384,17 @@ public class OutboxProcessorServiceScaled : BackgroundService
         {
             using (var connection = new SqlConnection(_connectionString))
             {
-                // Use connection pooling - don't close between calls
                 await connection.OpenAsync(stoppingToken);
                 
-                // Ensure we only take the oldest unpublished row per MortgageStid so
-                // we never emit Id N+1 for a mortgage before Id N is published.
+                // Get oldest unpublished message per MortgageStid to maintain ordering
+                // In-flight tracking prevents duplicates (no DB locking needed)
                 const string sql = @"
                     WITH Candidate AS (
                         SELECT
                             Id,
                             AggregateId,
                             EventType,
-                            CAST(0 AS bit) AS Processed, -- compat placeholder (column absent)
+                            CAST(0 AS bit) AS Processed,
                             CreatedAt,
                             ProcessedAt,
                             Rank,
@@ -376,7 +406,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
                             ProducedAt,
                             ReceivedAt,
                             ROW_NUMBER() OVER (PARTITION BY MortgageStid ORDER BY Id) AS rn
-                        FROM Outbox WITH (NOLOCK)
+                        FROM Outbox WITH (READPAST)
                         WHERE Publish = 0
                     )
                     SELECT TOP (@BatchSize)
@@ -397,6 +427,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
                     FROM Candidate
                     WHERE rn = 1
                     ORDER BY MortgageStid ASC, Id ASC";
+                
                 var messages = await connection.QueryAsync<OutboxMessage>(
                     sql,
                     new { BatchSize = _kafkaSettings.BatchSize });
