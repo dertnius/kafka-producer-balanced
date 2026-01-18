@@ -6,6 +6,13 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Linq;
 using Moq;
 using MyDotNetApp.Controllers;
 using MyDotNetApp.Models;
@@ -107,6 +114,109 @@ namespace MyDotNetApp.Tests
             }
 
             public Task RunPollAsync(CancellationToken token) => PollOutboxAsync(token);
+        }
+
+        [Fact]
+        public async Task Host_Uses_Singleton_Instance_For_Controller_And_Background_Service()
+        {
+            var configValues = new Dictionary<string, string>
+            {
+                {"ConnectionStrings:DefaultConnection", "Server=(localdb)\\MSSQLLocalDB;Integrated Security=true;"},
+                {"KafkaOutboxSettings:BootstrapServers", "localhost:9092"},
+                {"KafkaOutboxSettings:TopicName", "test-topic"},
+                {"KafkaOutboxSettings:SchemaRegistryUrl", "http://localhost:8081"},
+                {"KafkaOutboxSettings:PollingIntervalMs", "50"},
+                {"KafkaOutboxSettings:BatchSize", "10"},
+                {"KafkaOutboxSettings:MaxConcurrentProducers", "1"},
+                {"KafkaOutboxSettings:MaxProducerBuffer", "10"},
+                {"KafkaOutboxSettings:DatabaseConnectionPoolSize", "1"},
+                {"Publishing:BatchSize", "10"},
+                {"Publishing:FlushIntervalMs", "1000"}
+            };
+
+            var hostBuilder = Host.CreateDefaultBuilder()
+                .ConfigureAppConfiguration(builder => builder.AddInMemoryCollection(configValues))
+                .ConfigureServices((context, services) =>
+                {
+                    var startup = new Startup(context.Configuration);
+                    startup.ConfigureServices(services);
+
+                    // Remove unrelated hosted services (consumers, flushers, etc.)
+                    services.RemoveAll<IHostedService>();
+
+                    // Replace heavy dependencies with fakes to avoid external calls
+                    services.RemoveAll<IKafkaService>();
+                    services.AddSingleton(Mock.Of<IKafkaService>());
+                    services.RemoveAll<IPublishBatchHandler>();
+                    services.AddSingleton(Mock.Of<IPublishBatchHandler>());
+
+                    // Swap the processor registration with a testable singleton
+                    services.RemoveAll<OutboxProcessorServiceScaled>();
+                    services.AddSingleton<OutboxProcessorServiceScaled>(sp =>
+                    {
+                        var logger = sp.GetRequiredService<ILogger<OutboxProcessorServiceScaled>>();
+                        var settings = sp.GetRequiredService<IOptions<KafkaOutboxSettings>>();
+                        var kafkaService = sp.GetRequiredService<IKafkaService>();
+                        var publishBatchHandler = sp.GetRequiredService<IPublishBatchHandler>();
+                        var connectionString = context.Configuration.GetConnectionString("DefaultConnection")!;
+                        return new TestableOutboxProcessorSingleton(logger, settings, connectionString, kafkaService, publishBatchHandler);
+                    });
+
+                    // Ensure the hosted service uses the same singleton instance
+                    services.AddSingleton<IHostedService>(sp => sp.GetRequiredService<OutboxProcessorServiceScaled>());
+                });
+
+            using var host = hostBuilder.Build();
+            await host.StartAsync();
+
+            var processor = host.Services.GetRequiredService<OutboxProcessorServiceScaled>();
+            var hostedProcessor = host.Services.GetServices<IHostedService>().OfType<OutboxProcessorServiceScaled>().Single();
+            var controller = ActivatorUtilities.CreateInstance<OutboxController>(host.Services);
+
+            var testProcessor = Assert.IsType<TestableOutboxProcessorSingleton>(processor);
+            Assert.Same(processor, hostedProcessor); // hosted service and resolved singleton are the same instance
+            Assert.True(testProcessor.Started); // hosted service was started
+
+            // Act: trigger via controller, which should hit the same singleton instance
+            controller.TriggerProcessing();
+
+            Assert.Equal(1, testProcessor.CurrentTriggerCount);
+
+            await host.StopAsync();
+        }
+
+        private sealed class TestableOutboxProcessorSingleton : OutboxProcessorServiceScaled
+        {
+            private readonly TaskCompletionSource<bool> _startedTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public TestableOutboxProcessorSingleton(
+                ILogger<OutboxProcessorServiceScaled> logger,
+                IOptions<KafkaOutboxSettings> kafkaSettings,
+                string connectionString,
+                IKafkaService kafkaService,
+                IPublishBatchHandler publishBatchHandler) : base(logger, kafkaSettings, connectionString, kafkaService, publishBatchHandler)
+            {
+            }
+
+            public bool Started => _startedTcs.Task.IsCompleted;
+
+            protected override Task ExecuteAsync(CancellationToken stoppingToken)
+            {
+                _startedTcs.TrySetResult(true);
+                // Keep running until cancellation; no DB/Kafka work
+                return Task.Delay(Timeout.Infinite, stoppingToken);
+            }
+
+            public int CurrentTriggerCount
+            {
+                get
+                {
+                    var semaphore = (SemaphoreSlim)typeof(OutboxProcessorServiceScaled)
+                        .GetField("_manualTrigger", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                        .GetValue(this)!;
+                    return semaphore.CurrentCount;
+                }
+            }
         }
     }
 }

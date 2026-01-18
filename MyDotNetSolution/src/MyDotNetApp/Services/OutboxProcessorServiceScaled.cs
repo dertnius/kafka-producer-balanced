@@ -641,7 +641,11 @@ public class OutboxProcessorServiceScaled : BackgroundService
     public override void Dispose()
     {
         _databaseSemaphore?.Dispose();
-        _processingChannel?.Writer.Complete();
+        if (_processingChannel != null)
+        {
+            // Defensive: avoid throwing if already completed elsewhere
+            _processingChannel.Writer.TryComplete();
+        }
         
         // Dispose all MortgageStid locks
         foreach (var kvp in _mortgageStidLocks)
