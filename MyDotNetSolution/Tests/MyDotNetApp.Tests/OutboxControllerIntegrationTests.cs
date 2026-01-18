@@ -8,9 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Linq;
 using Moq;
@@ -119,7 +117,7 @@ namespace MyDotNetApp.Tests
         [Fact]
         public async Task Host_Uses_Singleton_Instance_For_Controller_And_Background_Service()
         {
-            var configValues = new Dictionary<string, string>
+            var configValues = new Dictionary<string, string?>
             {
                 {"ConnectionStrings:DefaultConnection", "Server=(localdb)\\MSSQLLocalDB;Integrated Security=true;"},
                 {"KafkaOutboxSettings:BootstrapServers", "localhost:9092"},
@@ -180,7 +178,7 @@ namespace MyDotNetApp.Tests
             // Act: trigger via controller, which should hit the same singleton instance
             controller.TriggerProcessing();
 
-            Assert.Equal(1, testProcessor.CurrentTriggerCount);
+            Assert.Equal(1, testProcessor.ManualTriggerCount);
 
             await host.StopAsync();
         }
@@ -207,16 +205,7 @@ namespace MyDotNetApp.Tests
                 return Task.Delay(Timeout.Infinite, stoppingToken);
             }
 
-            public int CurrentTriggerCount
-            {
-                get
-                {
-                    var semaphore = (SemaphoreSlim)typeof(OutboxProcessorServiceScaled)
-                        .GetField("_manualTrigger", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
-                        .GetValue(this)!;
-                    return semaphore.CurrentCount;
-                }
-            }
+            public new long ManualTriggerCount => base.ManualTriggerCount;
         }
     }
 }

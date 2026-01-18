@@ -40,6 +40,10 @@ public class OutboxProcessorServiceScaled : BackgroundService
     private readonly ConcurrentDictionary<string, long> _stidLastUsed;
     private readonly ConcurrentDictionary<long, long> _inFlightMessages; // Track messages with timestamp (TickCount64)
     private readonly SemaphoreSlim _manualTrigger; // Allows manual triggering via API
+    private readonly object _runLock = new();
+    private Task? _processingTasks;
+    private CancellationToken _stoppingToken;
+    private long _manualTriggerCount;
     private PerformanceMetrics _metrics;
 
     public OutboxProcessorServiceScaled(
@@ -114,26 +118,55 @@ public class OutboxProcessorServiceScaled : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("OutboxProcessorServiceScaled is starting");
-        
-        try
-        {
-            // Start background tasks
-            var pollingTask = PollOutboxAsync(stoppingToken);
-            var producingTask = ProduceMessagesAsync(stoppingToken);
-            var cleanupTask = CleanupStidLocksAsync(stoppingToken);
-            var metricsTask = ReportMetricsAsync(stoppingToken);
+        _stoppingToken = stoppingToken;
+        EnsureProcessingLoop();
 
-            await Task.WhenAll(pollingTask, producingTask, metricsTask, cleanupTask);
-        }
-        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        if (_processingTasks != null)
         {
-            _logger.LogInformation("OutboxProcessorServiceScaled cancelled");
+            await _processingTasks;
         }
-        catch (Exception ex)
+    }
+
+    private void EnsureProcessingLoop()
+    {
+        if (_stoppingToken != default && _stoppingToken.IsCancellationRequested)
         {
-            _logger.LogError(ex, "Unexpected error in OutboxProcessorServiceScaled - service will attempt to restart");
-            // Don't rethrow - let host manager restart if needed
+            return; // host is stopping, don't restart
         }
+
+        lock (_runLock)
+        {
+            if (_processingTasks == null || (_processingTasks.IsCompleted && (_stoppingToken == default || !_stoppingToken.IsCancellationRequested)))
+            {
+                _processingTasks = RunProcessingTasksAsync(_stoppingToken);
+            }
+        }
+    }
+
+    private Task RunProcessingTasksAsync(CancellationToken stoppingToken)
+    {
+        return Task.Run(async () =>
+        {
+            try
+            {
+                // Start background tasks
+                var pollingTask = PollOutboxAsync(stoppingToken);
+                var producingTask = ProduceMessagesAsync(stoppingToken);
+                var cleanupTask = CleanupStidLocksAsync(stoppingToken);
+                var metricsTask = ReportMetricsAsync(stoppingToken);
+
+                await Task.WhenAll(pollingTask, producingTask, metricsTask, cleanupTask);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                _logger.LogInformation("OutboxProcessorServiceScaled cancelled");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unexpected error in OutboxProcessorServiceScaled - processing tasks stopped");
+                // Leave task completed/faulted; next trigger call will attempt restart if host is still running
+            }
+        }, stoppingToken);
     }
 
     /// <summary>
@@ -609,9 +642,13 @@ public class OutboxProcessorServiceScaled : BackgroundService
     /// </summary>
     public void TriggerProcessing()
     {
+        // If processing loop stopped unexpectedly, attempt to restart it
+        EnsureProcessingLoop();
+
         _logger.LogInformation("Manual trigger requested");
         try
         {
+            Interlocked.Increment(ref _manualTriggerCount);
             // Release semaphore to wake up polling task
             _manualTrigger.Release();
         }
@@ -631,12 +668,15 @@ public class OutboxProcessorServiceScaled : BackgroundService
         {
             inFlightMessages = _inFlightMessages.Count,
             stidLocks = _mortgageStidLocks.Count,
+            manualTriggers = Interlocked.Read(ref _manualTriggerCount),
             metrics = new
             {
                 timestamp = DateTime.UtcNow
             }
         };
     }
+
+    public long ManualTriggerCount => Interlocked.Read(ref _manualTriggerCount);
 
     public override void Dispose()
     {
