@@ -288,6 +288,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
             {
                 await Task.Delay(10000, stoppingToken);
                 _metrics.LogMetrics(_logger);
+                _metrics.Reset(); // Reset metrics after logging to prevent memory accumulation
                 
                 // Clean up stale STID locks to prevent memory leak
                 CleanupStaleSemaphores();

@@ -31,4 +31,17 @@ public class PerformanceMetrics
             "Metrics - Fetched: {Fetched} ({FetchedRate:F0}/s) | Produced: {Produced} ({ProducedRate:F0}/s) | Marked: {Marked} | Failed: {Failed} | Elapsed: {Elapsed:F1}s",
             _fetched, fetchedRate, _produced, producedRate, _marked, _failed, elapsed);
     }
+
+    /// <summary>
+    /// Reset all metrics counters and restart the timer to prevent memory accumulation
+    /// Call after logging metrics to get periodic snapshots instead of cumulative totals
+    /// </summary>
+    public void Reset()
+    {
+        Interlocked.Exchange(ref _fetched, 0);
+        Interlocked.Exchange(ref _produced, 0);
+        Interlocked.Exchange(ref _marked, 0);
+        Interlocked.Exchange(ref _failed, 0);
+        _timer.Restart();
+    }
 }
