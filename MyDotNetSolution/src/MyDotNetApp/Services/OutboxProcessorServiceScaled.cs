@@ -39,9 +39,6 @@ public class OutboxProcessorServiceScaled : BackgroundService
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _mortgageStidLocks;
     private readonly ConcurrentDictionary<string, long> _stidLastUsed;
     private readonly ConcurrentDictionary<long, long> _inFlightMessages; // Track messages with timestamp (TickCount64)
-    private readonly SemaphoreSlim _manualTrigger; // Allows manual triggering via API
-    private readonly object _runLock = new();
-    private Task? _processingTasks;
     private CancellationToken _stoppingToken;
     private long _manualTriggerCount;
     private PerformanceMetrics _metrics;
@@ -64,7 +61,6 @@ public class OutboxProcessorServiceScaled : BackgroundService
         _mortgageStidLocks = new ConcurrentDictionary<string, SemaphoreSlim>();
         _stidLastUsed = new ConcurrentDictionary<string, long>();
         _inFlightMessages = new ConcurrentDictionary<long, long>(); // Track with timestamp for cleanup
-        _manualTrigger = new SemaphoreSlim(0); // Start with 0, Release() to trigger
         _processingChannel = Channel.CreateBounded<OutboxMessage>(
             new BoundedChannelOptions(_kafkaSettings.MaxProducerBuffer)
             {
@@ -115,36 +111,20 @@ public class OutboxProcessorServiceScaled : BackgroundService
         await base.StartAsync(cancellationToken);
     }
 
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("OutboxProcessorServiceScaled is starting");
-        _stoppingToken = stoppingToken;
-        await RunProcessingTasksAsync(stoppingToken);
-    }
-
-    private void EnsureProcessingLoop()
-    {
-        if (_stoppingToken != default && _stoppingToken.IsCancellationRequested)
-        {
-            return; // host is stopping, don't restart
-        }
-
-        lock (_runLock)
-        {
-            if (_processingTasks == null || (_processingTasks.IsCompleted && (_stoppingToken == default || !_stoppingToken.IsCancellationRequested)))
-            {
-                _processingTasks = RunProcessingTasksAsync(_stoppingToken);
-            }
-        }
-    }
-
-    private Task RunProcessingTasksAsync(CancellationToken stoppingToken)
-    {
+        // Return immediately - run all work on background thread pool
         return Task.Run(async () =>
         {
+            // Wait a bit to ensure web app is fully started
+            await Task.Delay(100, stoppingToken);
+            
+            _logger.LogInformation("OutboxProcessorServiceScaled is starting");
+            _stoppingToken = stoppingToken;
+            
             try
             {
-                // Start background tasks
+                // Start all background tasks
                 var pollingTask = PollOutboxAsync(stoppingToken);
                 var producingTask = ProduceMessagesAsync(stoppingToken);
                 var cleanupTask = CleanupStidLocksAsync(stoppingToken);
@@ -158,15 +138,19 @@ public class OutboxProcessorServiceScaled : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error in OutboxProcessorServiceScaled - processing tasks stopped");
-                // Leave task completed/faulted; next trigger call will attempt restart if host is still running
+                _logger.LogError(ex, "Unexpected error in OutboxProcessorServiceScaled");
             }
         }, stoppingToken);
     }
 
+    private void EnsureProcessingLoop()
+    {
+        // No longer needed - ExecuteAsync handles everything
+    }
+
     /// <summary>
-    /// Task 1: Poll database for unprocessed messages on a fixed timer interval OR when manually triggered
-    /// Polls every PollingIntervalMs (default 100ms) OR when TriggerProcessing() is called
+    /// Task 1: Poll database for unprocessed messages on a fixed timer interval
+    /// Polls every PollingIntervalMs (default 100ms)
     /// </summary>
     protected internal virtual async Task PollOutboxAsync(CancellationToken stoppingToken)
     {
@@ -174,17 +158,8 @@ public class OutboxProcessorServiceScaled : BackgroundService
         {
             try
             {
-                // Wait for either: timer interval OR manual trigger
-                var delayTask = Task.Delay(_kafkaSettings.PollingIntervalMs, stoppingToken);
-                var triggerTask = _manualTrigger.WaitAsync(stoppingToken);
-                
-                var completedTask = await Task.WhenAny(delayTask, triggerTask);
-                
-                // If manual trigger fired, log it
-                if (completedTask == triggerTask)
-                {
-                    _logger.LogInformation("Manual processing trigger received via API");
-                }
+                // Wait for polling interval
+                await Task.Delay(_kafkaSettings.PollingIntervalMs, stoppingToken);
 
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var messages = await GetUnprocessedMessagesAsync(stoppingToken);
@@ -633,25 +608,34 @@ public class OutboxProcessorServiceScaled : BackgroundService
     }
 
     /// <summary>
-    /// Manually trigger processing immediately (called from API endpoint)
+    /// Directly poll and process messages - call from API endpoint for immediate processing
+    /// Returns count of messages added to processing channel
     /// </summary>
-    public void TriggerProcessing()
+    public async Task<int> TriggerPollAsync(CancellationToken cancellationToken = default)
     {
-        // If processing loop stopped unexpectedly, attempt to restart it
-        EnsureProcessingLoop();
+        _logger.LogInformation("Direct poll requested via API");
+        Interlocked.Increment(ref _manualTriggerCount);
+        
+        var messages = await GetUnprocessedMessagesAsync(cancellationToken);
+        if (messages.Count == 0)
+        {
+            _logger.LogInformation("No messages to process");
+            return 0;
+        }
 
-        _logger.LogInformation("Manual trigger requested");
-        try
+        // Add to processing channel
+        int addedCount = 0;
+        foreach (var message in messages)
         {
-            Interlocked.Increment(ref _manualTriggerCount);
-            // Release semaphore to wake up polling task
-            _manualTrigger.Release();
+            if (_inFlightMessages.TryAdd(message.Id, Environment.TickCount64))
+            {
+                await _processingChannel.Writer.WriteAsync(message, cancellationToken);
+                addedCount++;
+            }
         }
-        catch (SemaphoreFullException)
-        {
-            // Already triggered, ignore
-            _logger.LogDebug("Manual trigger already pending");
-        }
+        
+        _logger.LogInformation("Added {Count} messages for processing", addedCount);
+        return addedCount;
     }
 
     /// <summary>
@@ -690,7 +674,6 @@ public class OutboxProcessorServiceScaled : BackgroundService
         _mortgageStidLocks.Clear();
 
         _schemaRegistryClient?.Dispose();
-        _manualTrigger?.Dispose();
         
         base.Dispose();
     }

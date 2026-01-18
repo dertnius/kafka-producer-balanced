@@ -52,12 +52,17 @@ namespace MyDotNetApp.Services
             _instanceId = instanceId;
         }
 
-        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+        protected override Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("OutboxConsumerService #{InstanceId} is starting with batchSize={BatchSize}, flushIntervalMs={FlushIntervalMs} (Avro format). Target: 1M msgs/min",
-                _instanceId, _batchSize, _flushIntervalMs);
-            try
+            return Task.Run(async () =>
             {
+                // Wait a bit to ensure web app is fully started
+                await Task.Delay(100, stoppingToken);
+                
+                _logger.LogInformation("OutboxConsumerService #{InstanceId} is starting with batchSize={BatchSize}, flushIntervalMs={FlushIntervalMs} (Avro format). Target: 1M msgs/min",
+                    _instanceId, _batchSize, _flushIntervalMs);
+                try
+                {
                 InitializeConsumer();
                 
                 // Batch accumulator with optimized capacity
@@ -190,6 +195,7 @@ namespace MyDotNetApp.Services
                 _consumer?.Dispose();
                 _logger.LogInformation("OutboxConsumerService #{InstanceId} has stopped.", _instanceId);
             }
+            }, stoppingToken);
         }
 
         /// <summary>

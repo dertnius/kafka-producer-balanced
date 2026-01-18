@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using MyDotNetApp.Services;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Threading.Tasks;
 
 namespace MyDotNetApp.Controllers;
 
@@ -19,19 +20,21 @@ public class OutboxController : ControllerBase
     }
 
     /// <summary>
-    /// Manually trigger outbox processing immediately (bypasses timer)
+    /// Manually trigger outbox processing - directly polls and adds messages to processing queue
+    /// Returns count of messages added
     /// </summary>
-    /// <returns>Success confirmation</returns>
     [HttpPost("trigger")]
-    public IActionResult TriggerProcessing()
+    public async Task<IActionResult> TriggerProcessing()
     {
         _logger.LogInformation("Received manual trigger request from API");
-        _outboxProcessor.TriggerProcessing();
+        var cancellationToken = HttpContext?.RequestAborted ?? default;
+        var count = await _outboxProcessor.TriggerPollAsync(cancellationToken);
         
         return Ok(new 
         { 
-            success = true, 
-            message = "Outbox processing triggered successfully. Messages will be processed immediately.",
+            success = true,
+            messagesAdded = count,
+            message = count > 0 ? $"Processing {count} messages" : "No messages to process",
             timestamp = DateTime.UtcNow
         });
     }

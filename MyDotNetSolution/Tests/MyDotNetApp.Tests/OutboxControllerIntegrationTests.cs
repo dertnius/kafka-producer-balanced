@@ -46,7 +46,7 @@ namespace MyDotNetApp.Tests
         }
 
         [Fact]
-        public void TriggerEndpoint_ReturnsOk_AndInvokesService()
+        public async Task TriggerEndpoint_ReturnsOk_AndInvokesService()
         {
             // Arrange
             var processor = CreateProcessor();
@@ -54,7 +54,7 @@ namespace MyDotNetApp.Tests
             var controller = new OutboxController(processor, controllerLogger);
 
             // Act
-            var result = controller.TriggerProcessing() as OkObjectResult;
+            var result = await controller.TriggerProcessing() as OkObjectResult;
 
             // Assert
             Assert.NotNull(result);
@@ -83,7 +83,7 @@ namespace MyDotNetApp.Tests
             // Act: start polling loop and trigger manually
             var pollTask = processor.RunPollAsync(cts.Token);
             await Task.Delay(50, CancellationToken.None); // allow delay to start
-            var result = controller.TriggerProcessing();
+            var result = await controller.TriggerProcessing();
             await pollTask; // should complete when token cancels
 
             // Assert
@@ -105,10 +105,12 @@ namespace MyDotNetApp.Tests
             {
             }
 
-            protected override async Task PollOutboxAsync(CancellationToken stoppingToken)
+            protected override async Task<List<MyDotNetApp.Services.OutboxMessage>> GetUnprocessedMessagesAsync(CancellationToken stoppingToken)
             {
                 Interlocked.Increment(ref _fetchCount);
-                await base.PollOutboxAsync(stoppingToken);
+                // Return empty list to avoid database calls in tests
+                await Task.CompletedTask;
+                return new List<MyDotNetApp.Services.OutboxMessage>();
             }
 
             public Task RunPollAsync(CancellationToken token) => PollOutboxAsync(token);
@@ -176,7 +178,7 @@ namespace MyDotNetApp.Tests
             Assert.True(testProcessor.Started); // hosted service was started
 
             // Act: trigger via controller, which should hit the same singleton instance
-            controller.TriggerProcessing();
+            await controller.TriggerProcessing();
 
             Assert.Equal(1, testProcessor.ManualTriggerCount);
 
@@ -203,6 +205,12 @@ namespace MyDotNetApp.Tests
                 _startedTcs.TrySetResult(true);
                 // Keep running until cancellation; no DB/Kafka work
                 return Task.Delay(Timeout.Infinite, stoppingToken);
+            }
+
+            protected override Task<List<MyDotNetApp.Services.OutboxMessage>> GetUnprocessedMessagesAsync(CancellationToken cancellationToken)
+            {
+                // Override to avoid actual database calls
+                return Task.FromResult(new List<MyDotNetApp.Services.OutboxMessage>());
             }
 
             public new long ManualTriggerCount => base.ManualTriggerCount;
