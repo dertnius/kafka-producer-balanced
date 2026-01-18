@@ -43,10 +43,7 @@ namespace MyDotNetApp.Tests
                 PollingIntervalMs = 50,
                 MaxConcurrentProducers = 3,
                 MaxProducerBuffer = 1000,
-                DatabaseConnectionPoolSize = 10,
-                EnableAdaptiveBackoff = false,
-                MaxPollingIntervalMs = 5000,
-                BackoffMultiplier = 2.0
+                DatabaseConnectionPoolSize = 10
             };
         }
 

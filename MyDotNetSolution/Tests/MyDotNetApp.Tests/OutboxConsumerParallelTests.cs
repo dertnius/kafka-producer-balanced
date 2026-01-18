@@ -33,7 +33,7 @@ namespace MyDotNetApp.Tests
                 DatabaseConnectionPoolSize = 10
             };
 
-            var configDict = new Dictionary<string, string>
+            var configDict = new Dictionary<string, string?>
             {
                 ["Processing:PollIntervalMs"] = "5000",
                 ["Consumer:BatchSize"] = "1000",

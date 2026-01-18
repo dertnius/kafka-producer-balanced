@@ -228,7 +228,7 @@ namespace MyDotNetApp.Tests
 
             // Assert
             Assert.Equal(50000, settings.BatchSize);
-            Assert.Equal(10, settings.PollingIntervalMs);
+            Assert.Equal(100, settings.PollingIntervalMs);
             Assert.Equal(20, settings.MaxConcurrentProducers);
             Assert.Equal(200000, settings.MaxProducerBuffer);
             Assert.Equal(40, settings.DatabaseConnectionPoolSize);

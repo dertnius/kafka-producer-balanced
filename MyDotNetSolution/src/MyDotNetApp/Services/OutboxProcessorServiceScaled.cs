@@ -39,6 +39,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _mortgageStidLocks;
     private readonly ConcurrentDictionary<string, long> _stidLastUsed;
     private readonly ConcurrentDictionary<long, long> _inFlightMessages; // Track messages with timestamp (TickCount64)
+    private readonly SemaphoreSlim _manualTrigger; // Allows manual triggering via API
     private PerformanceMetrics _metrics;
 
     public OutboxProcessorServiceScaled(
@@ -59,6 +60,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
         _mortgageStidLocks = new ConcurrentDictionary<string, SemaphoreSlim>();
         _stidLastUsed = new ConcurrentDictionary<string, long>();
         _inFlightMessages = new ConcurrentDictionary<long, long>(); // Track with timestamp for cleanup
+        _manualTrigger = new SemaphoreSlim(0); // Start with 0, Release() to trigger
         _processingChannel = Channel.CreateBounded<OutboxMessage>(
             new BoundedChannelOptions(_kafkaSettings.MaxProducerBuffer)
             {
@@ -134,62 +136,39 @@ public class OutboxProcessorServiceScaled : BackgroundService
     }
 
     /// <summary>
-    /// Task 1: Poll database for unprocessed messages with smart backoff
-    /// Only polls when messages are being processed, backs off when idle
+    /// Task 1: Poll database for unprocessed messages on a fixed timer interval OR when manually triggered
+    /// Polls every PollingIntervalMs (default 100ms) OR when TriggerProcessing() is called
     /// </summary>
-    private async Task PollOutboxAsync(CancellationToken stoppingToken)
+    protected internal virtual async Task PollOutboxAsync(CancellationToken stoppingToken)
     {
-        int currentPollingDelayMs = _kafkaSettings.PollingIntervalMs;
-        int consecutiveEmptyPolls = 0;
-        var lastPollTime = DateTime.UtcNow;
-
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                // Check if processing channel has capacity before polling
-                // If channel is full, skip this poll to back off naturally
-                var channelCount = _processingChannel.Reader.Count;
-                var channelCapacity = _kafkaSettings.MaxProducerBuffer;
+                // Wait for either: timer interval OR manual trigger
+                var delayTask = Task.Delay(_kafkaSettings.PollingIntervalMs, stoppingToken);
+                var triggerTask = _manualTrigger.WaitAsync(stoppingToken);
                 
-                if (channelCount > channelCapacity * 0.8)  // 80% full, back off
+                var completedTask = await Task.WhenAny(delayTask, triggerTask);
+                
+                // If manual trigger fired, log it
+                if (completedTask == triggerTask)
                 {
-                    _logger.LogDebug("Processing channel at {Percent}% capacity, backing off", 
-                        (channelCount * 100) / channelCapacity);
-                    await Task.Delay(Math.Min(currentPollingDelayMs * 2, _kafkaSettings.MaxPollingIntervalMs), stoppingToken);
-                    continue;
+                    _logger.LogInformation("Manual processing trigger received via API");
                 }
 
+                var sw = System.Diagnostics.Stopwatch.StartNew();
                 var messages = await GetUnprocessedMessagesAsync(stoppingToken);
-                var pollDuration = DateTime.UtcNow - lastPollTime;
-                lastPollTime = DateTime.UtcNow;
+                sw.Stop();
                 
                 if (messages.Count == 0)
                 {
-                    consecutiveEmptyPolls++;
-                    
-                    // Adaptive backoff: increase delay exponentially when idle
-                    if (_kafkaSettings.EnableAdaptiveBackoff)
-                    {
-                        currentPollingDelayMs = (int)Math.Min(
-                            currentPollingDelayMs * _kafkaSettings.BackoffMultiplier,
-                            _kafkaSettings.MaxPollingIntervalMs);
-                        
-                        _logger.LogDebug(
-                            "No messages found (poll #{EmptyCount}). Backing off to {DelayMs}ms", 
-                            consecutiveEmptyPolls, currentPollingDelayMs);
-                    }
-
-                    await Task.Delay(currentPollingDelayMs, stoppingToken);
+                    // No messages, continue to next timer tick
                     continue;
                 }
 
-                // Reset backoff when work is found
-                consecutiveEmptyPolls = 0;
-                currentPollingDelayMs = _kafkaSettings.PollingIntervalMs;
-
                 _logger.LogDebug("Fetched {MessageCount} messages from outbox (query took {Duration}ms)", 
-                    messages.Count, pollDuration.TotalMilliseconds);
+                    messages.Count, sw.Elapsed.TotalMilliseconds);
                 _metrics.RecordFetched(messages.Count);
 
                 // Add messages to processing channel, skipping duplicates already in-flight
@@ -224,9 +203,8 @@ public class OutboxProcessorServiceScaled : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error polling outbox");
-                // Increase delay on error to avoid hammering DB
-                currentPollingDelayMs = Math.Min(currentPollingDelayMs * 2, _kafkaSettings.MaxPollingIntervalMs);
-                await Task.Delay(currentPollingDelayMs, stoppingToken);
+                // Wait before retrying on error
+                await Task.Delay(_kafkaSettings.PollingIntervalMs * 5, stoppingToken);
             }
         }
 
@@ -377,7 +355,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
         }
     }
 
-    private async Task<List<OutboxMessage>> GetUnprocessedMessagesAsync(CancellationToken stoppingToken)
+    protected virtual async Task<List<OutboxMessage>> GetUnprocessedMessagesAsync(CancellationToken stoppingToken)
     {
         await _databaseSemaphore.WaitAsync(stoppingToken);
         
@@ -623,6 +601,40 @@ public class OutboxProcessorServiceScaled : BackgroundService
         await base.StopAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Manually trigger processing immediately (called from API endpoint)
+    /// </summary>
+    public void TriggerProcessing()
+    {
+        _logger.LogInformation("Manual trigger requested");
+        try
+        {
+            // Release semaphore to wake up polling task
+            _manualTrigger.Release();
+        }
+        catch (SemaphoreFullException)
+        {
+            // Already triggered, ignore
+            _logger.LogDebug("Manual trigger already pending");
+        }
+    }
+
+    /// <summary>
+    /// Get current processing statistics
+    /// </summary>
+    public object GetProcessingStats()
+    {
+        return new
+        {
+            inFlightMessages = _inFlightMessages.Count,
+            stidLocks = _mortgageStidLocks.Count,
+            metrics = new
+            {
+                timestamp = DateTime.UtcNow
+            }
+        };
+    }
+
     public override void Dispose()
     {
         _databaseSemaphore?.Dispose();
@@ -636,6 +648,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
         _mortgageStidLocks.Clear();
 
         _schemaRegistryClient?.Dispose();
+        _manualTrigger?.Dispose();
         
         base.Dispose();
     }
