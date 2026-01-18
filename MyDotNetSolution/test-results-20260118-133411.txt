@@ -1,0 +1,302 @@
+Test run for C:\Users\midgard\dev\kafka-producer-balanced\MyDotNetSolution\tests\MyDotNetApp.Tests\bin\Debug\net8.0\MyDotNetApp.Tests.dll (.NETCoreApp,Version=v8.0)
+Microsoft (R) Test Execution Command Line Tool Version 17.8.0 (x64)
+Copyright (c) Microsoft Corporation.  All rights reserved.
+
+Starting test execution, please wait...
+A total of 1 test files matched the specified pattern.
+C:\Users\midgard\dev\kafka-producer-balanced\MyDotNetSolution\tests\MyDotNetApp.Tests\bin\Debug\net8.0\MyDotNetApp.Tests.dll
+[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v2.5.4.1+b9eacec401 (64-bit .NET 8.0.23)
+[xUnit.net 00:00:00.16]   Discovering: MyDotNetApp.Tests
+[xUnit.net 00:00:00.19]   Discovered:  MyDotNetApp.Tests
+[xUnit.net 00:00:00.19]   Starting:    MyDotNetApp.Tests
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledTests.Constructor_NullOptions_ThrowsArgumentNullException [62 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.Configuration_LoadsMessageFormat_AsAvro [62 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerParallelTests.MultipleConsumers_CanBeCreated_WithDifferentInstanceIds [65 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledTests.Constructor_NullSchemaRegistryUrl_ThrowsArgumentNullException [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.StopAsync_WithCancellation_CompletesSuccessfully [1 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.Constructor_InitializesWithValidDependencies [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorCrashRecoveryTests.DuplicateAfterCrash_IsSentInCorrectOrder [66 ms]
+  Standard Output Messages:
+ Send attempt #1 for message ID: 1
+ Send attempt #2 for message ID: 1
+ Send attempt #1 for message ID: 2
+ âœ… Duplicate sent in correct order: [1, 1(dup), 2]
+
+
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.ExtractMessageId_TooShortData_ReturnsNegativeOne [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.ExtractMessageId_ValidAvroHexString_ReturnsMessageId [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.Configuration_LoadsBatchSize_From_ConsumerSettings [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.Constructor_ThrowsOnNullLogger [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerParallelTests.ThreeConsumers_ProcessDifferentPartitions_Simultaneously [2 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerParallelTests.Configuration_SupportsMultipleInstanceCount [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.ExtractMessageId_EmptyString_ReturnsNegativeOne [6 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.ConvertHexStringToBytes_OddLength_ThrowsException [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorCrashRecoveryTests.InFlightDictionary_ClearedAfterSuccess [8 ms]
+  Standard Output Messages:
+ âœ… In-flight tracking cleared after successful send
+
+
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.Configuration_LoadsFlushInterval_From_ConsumerSettings [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.ExtractMessageId_InvalidHex_ReturnsNegativeOne [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorCrashRecoveryTests.InFlightDictionary_PreventsDuplicatesInChannel [< 1 ms]
+  Standard Output Messages:
+ Added message 100 to channel
+ Added message 101 to channel
+ Skipped duplicate message 100
+ Added message 102 to channel
+ Skipped duplicate message 100
+ âœ… In-flight dictionary prevents channel duplicates
+
+
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.Constructor_ThrowsOnNullKafkaSettings [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorCrashRecoveryTests.InFlightDictionary_ClearedAfterFailure_AllowsRetry [< 1 ms]
+  Standard Output Messages:
+ âœ… Failed messages can be retried after in-flight cleared
+
+
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.ConvertHexStringToBytes_EmptyString_ReturnsEmptyArray [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.ConvertHexStringToBytes_ValidHex_ReturnsCorrectBytes [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.ConvertHexStringToBytes_WithSpaces_RemovesSpacesAndConverts [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.Constructor_ThrowsOnNullConfiguration [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerServiceTests.Constructor_ThrowsOnNullOutboxService [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorCrashRecoveryTests.InFlightCleanup_RemovesStuckMessages_PreventingMemoryLeak [3 ms]
+  Standard Output Messages:
+ Removed stuck message 1 (age: 5.0 min)
+ Removed stuck message 3 (age: 5.1 min)
+ âœ… Cleaned 2 stuck messages, 2 remain active
+ âœ… Memory leak prevented - stuck messages removed after 5 minutes
+
+
+  Passed MyDotNetApp.Tests.OutboxProcessorCrashRecoveryTests.CrashRecovery_DatabaseStateNotModified_UntilFlush [< 1 ms]
+  Standard Output Messages:
+ âœ… Database state unchanged during flush window (100ms)
+ âœ… Messages 1 & 2 will be re-sent after crash (duplicates in correct order)
+
+
+  Passed MyDotNetApp.Tests.OutboxControllerIntegrationTests.TriggerEndpoint_ReturnsOk_AndInvokesService [95 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledE2ETests.E2E_100000Mortgages_ConcurrentProcessingImprovesThroughput [108 ms]
+  Standard Output Messages:
+ 
+========== E2E_100000Mortgages_ConcurrentProcessingImprovesThroughput ==========
+ âœ“ Processed: 100,000 messages
+ âœ“ Elapsed: 28ms
+ âœ“ Throughput: 3,421,049 msg/sec
+ âœ“ Concurrent Producers: 5
+ âœ“ Avg per Producer: 684,210 msg/sec
+
+
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledTests.StopAsync_CompletesChannels [42 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledTests.Dispose_DisposesResources [1 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledTests.Constructor_NullLogger_ThrowsArgumentNullException [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledTests.Constructor_ValidParameters_InitializesSuccessfully [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledTests.StartAsync_InitializesKafkaProducers [12 ms]
+
+ÉÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»
+º TEST RESULTS: E2E_Process10000Mortgages                     º
+ÌÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¹
+º Messages Processed:      10,000                                º
+º Messages Failed:         0                                     º
+º Elapsed Time:            2ms                                   º
+º Throughput:              5,000,000 msg/sec                     º
+º Avg Time per Message:    0.200æs                               º
+ÌÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¹
+º Unique STIDs:            1000                                  º
+º Avg Messages per STID:   10                                    º
+º Unique Pool Codes:       100                                   º
+º Avg Messages per Pool:   100                                   º
+ÈÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¼
+
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledTests.Constructor_NullConnectionString_ThrowsArgumentNullException [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledTests.PerformanceMetrics_ThreadSafety_HandlesConcurrentCalls [2 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledTests.StopAsync_FlushesProducersAndLogs [2 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledTests.PerformanceMetrics_RecordAndLog [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledTests.PerformanceMetrics_MultipleRecordOperations_AggregatesCorrectly [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledTests.KafkaOutboxSettings_DefaultValues_Correct [< 1 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledE2ETests.E2E_Process10000Mortgages_Successfully [39 ms]
+  Standard Output Messages:
+ 
+ â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+ â•‘ TEST RESULTS: E2E_Process10000Mortgages                     â•‘
+ â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+ â•‘ Messages Processed:      10,000                                â•‘
+ â•‘ Messages Failed:         0                                     â•‘
+ â•‘ Elapsed Time:            2ms                                   â•‘
+ â•‘ Throughput:              5,000,000 msg/sec                     â•‘
+ â•‘ Avg Time per Message:    0.200Âµs                               â•‘
+ â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+ â•‘ Unique STIDs:            1000                                  â•‘
+ â•‘ Avg Messages per STID:   10                                    â•‘
+ â•‘ Unique Pool Codes:       100                                   â•‘
+ â•‘ Avg Messages per Pool:   100                                   â•‘
+ â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+ 
+
+
+  Passed MyDotNetApp.Tests.OutboxProcessorCrashRecoveryTests.InFlightWithTimestamp_TracksMessageAge [124 ms]
+  Standard Output Messages:
+ âœ… Message age tracked: 125ms
+ âœ… Timestamp enables cleanup of stuck messages
+
+
+  Passed MyDotNetApp.Tests.OutboxProcessorCrashRecoveryTests.CrashRecovery_MessagesInChannel_AreRepolledInCorrectOrder [1 ms]
+  Standard Output Messages:
+ âœ… Crash recovery maintains ordering through database query
+
+
+  Passed MyDotNetApp.Tests.OutboxProcessorCrashRecoveryTests.PerStidOrdering_EnsuresSingleMessageAtATime [< 1 ms]
+  Standard Output Messages:
+ âœ… Per-STID locking ensures single message processing
+
+
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledE2ETests.E2E_100000Mortgages_DifferentPoolCodes_ProcessedCorrectly [102 ms]
+  Standard Output Messages:
+ 
+========== E2E_100000Mortgages_DifferentPoolCodes_ProcessedCorrectly ==========
+ âœ“ Processed: 100,000 messages
+ âœ“ Unique Pool Codes: 100
+ âœ“ Messages per Pool Code avg: 1,000
+ âœ“ Elapsed: 23ms
+ 
+  Top 5 Pool Codes by message count:
+     POOL-003: 1000 messages
+     POOL-001: 1000 messages
+     POOL-004: 1000 messages
+     POOL-002: 1000 messages
+     POOL-006: 1000 messages
+
+
+  Passed MyDotNetApp.Tests.OutboxProcessorCrashRecoveryTests.MultipleSTIDs_MaintainIndependentOrdering [69 ms]
+  Standard Output Messages:
+ âœ… ABC order: 1, 2, 3
+ âœ… XYZ order: 4, 5, 6
+ âœ… Independent STID ordering maintained during concurrent processing
+
+
+  Passed MyDotNetApp.Tests.OutboxProcessorCrashRecoveryTests.InFlightTracking_AfterCrash_IsEmptyAndAllowsReprocessing [1 ms]
+  Standard Output Messages:
+ âœ… In-flight tracking resets after crash, allowing reprocessing
+
+
+  Passed MyDotNetApp.Tests.OutboxProcessorCrashRecoveryTests.DatabaseQuery_AlwaysReturnsOldestMessagePerStid [9 ms]
+  Standard Output Messages:
+ âœ… Query returns oldest message per STID: ABC=1, DEF=4
+
+
+  Passed MyDotNetApp.Tests.OutboxControllerIntegrationTests.ManualTrigger_DoesNotBlock_TimerPolling [204 ms]
+  Passed MyDotNetApp.Tests.OutboxConsumerParallelTests.ParallelExecution_IsFasterThanSequential [247 ms]
+
+ÉÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»
+º TEST RESULTS: E2E_Process100000Mortgages_Successfully       º
+ÌÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¹
+º Messages Processed:      100,000                               º
+º Messages Failed:         0                                     º
+º Elapsed Time:            23ms                                  º
+º Throughput:              4,347,826 msg/sec                     º
+º Avg Time per Message:    0.230æs                               º
+ÌÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¹
+º Unique STIDs:            1000                                  º
+º Avg Messages per STID:   100                                   º
+º Unique Pool Codes:       100                                   º
+º Avg Messages per Pool:   1,000                                 º
+ÈÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¼
+
+
+ÉÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»
+º TEST RESULTS: E2E_Process1000Mortgages                      º
+ÌÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¹
+º Messages Processed:      1,000                                 º
+º Messages Failed:         0                                     º
+º Elapsed Time:            0ms                                   º
+ÌÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¹
+º Unique STIDs:            1000                                  º
+º Avg Messages per STID:   1                                     º
+º Unique Pool Codes:       100                                   º
+º Avg Messages per Pool:   10                                    º
+ÈÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¼
+
+[xUnit.net 00:00:00.93]   Finished:    MyDotNetApp.Tests
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledE2ETests.E2E_Process100000Mortgages_Successfully [122 ms]
+  Standard Output Messages:
+ 
+ â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+ â•‘ TEST RESULTS: E2E_Process100000Mortgages_Successfully       â•‘
+ â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+ â•‘ Messages Processed:      100,000                               â•‘
+ â•‘ Messages Failed:         0                                     â•‘
+ â•‘ Elapsed Time:            23ms                                  â•‘
+ â•‘ Throughput:              4,347,826 msg/sec                     â•‘
+ â•‘ Avg Time per Message:    0.230Âµs                               â•‘
+ â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+ â•‘ Unique STIDs:            1000                                  â•‘
+ â•‘ Avg Messages per STID:   100                                   â•‘
+ â•‘ Unique Pool Codes:       100                                   â•‘
+ â•‘ Avg Messages per Pool:   1,000                                 â•‘
+ â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+ 
+
+
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledE2ETests.E2E_100000Mortgages_PerformanceMetricsAccurate [103 ms]
+  Standard Output Messages:
+ 
+========== E2E_100000Mortgages_PerformanceMetricsAccurate ==========
+ âœ“ Processed: 100,000 messages
+ âœ“ Metrics Recorded: 100,000 messages
+ âœ“ Elapsed: 21ms
+ âœ“ Avg Time per Message: 0.210Âµs
+
+
+  Passed MyDotNetApp.Tests.OutboxConsumerParallelTests.MultipleConsumers_ProcessBatchesConcurrently_WithoutBlocking [231 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledE2ETests.E2E_100000Mortgages_WithSerializationErrors_ContinuesProcessing [106 ms]
+  Standard Output Messages:
+ 
+========== E2E_100000Mortgages_WithSerializationErrors_ContinuesProcessing ==========
+ âœ“ Processed: 99,000 messages
+ âœ“ Failed: 1,000 messages
+ âœ“ Success Rate: 99.00%
+ âœ“ Elapsed: 21ms
+ âœ“ Throughput (overall): 4,761,905 attempts/sec
+
+
+  Passed MyDotNetApp.Tests.OutboxConsumerParallelTests.ParallelBatchUpdates_DoNotBlockEachOther [52 ms]
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledE2ETests.E2E_100000Mortgages_MaintainsOrderingPerStid [117 ms]
+  Standard Output Messages:
+ 
+========== E2E_100000Mortgages_MaintainsOrderingPerStid ==========
+ âœ“ Processed: 100,000 messages
+ âœ“ Unique STIDs: 1000
+ âœ“ Messages per STID avg: 100
+ âœ“ Elapsed: 29ms
+ 
+  Top 5 STIDs by message count:
+     STID-0001: 0 messages
+     STID-0003: 0 messages
+     STID-0002: 0 messages
+     STID-0005: 0 messages
+     STID-0004: 0 messages
+
+
+  Passed MyDotNetApp.Tests.OutboxProcessorServiceScaledE2ETests.E2E_Process1000Mortgages_Successfully [2 ms]
+  Standard Output Messages:
+ 
+ â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+ â•‘ TEST RESULTS: E2E_Process1000Mortgages                      â•‘
+ â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+ â•‘ Messages Processed:      1,000                                 â•‘
+ â•‘ Messages Failed:         0                                     â•‘
+ â•‘ Elapsed Time:            0ms                                   â•‘
+ â• â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•£
+ â•‘ Unique STIDs:            1000                                  â•‘
+ â•‘ Avg Messages per STID:   1                                     â•‘
+ â•‘ Unique Pool Codes:       100                                   â•‘
+ â•‘ Avg Messages per Pool:   10                                    â•‘
+ â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+ 
+
+
+
+Test Run Successful.
+Total tests: 58
+     Passed: 58
+ Total time: 1.3784 Seconds
+
+Workload updates are available. Run `dotnet workload list` for more information.
