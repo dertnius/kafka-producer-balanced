@@ -30,13 +30,15 @@ namespace MyDotNetApp.Services
         private readonly int _pollIntervalMs;
         private readonly int _batchSize;
         private readonly int _flushIntervalMs;
+        private readonly int _instanceId;
         private IConsumer<string, string>? _consumer;
 
         public OutboxConsumerService(
             ILogger<OutboxConsumerService> logger,
             IOutboxService outboxService,
             IConfiguration configuration,
-            IOptions<KafkaOutboxSettings> kafkaSettings)
+            IOptions<KafkaOutboxSettings> kafkaSettings,
+            int instanceId = 0)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _outboxService = outboxService ?? throw new ArgumentNullException(nameof(outboxService));
@@ -46,12 +48,13 @@ namespace MyDotNetApp.Services
             // Batch configuration for high-throughput scenarios
             _batchSize = _configuration.GetValue<int>("Consumer:BatchSize", 5000);
             _flushIntervalMs = _configuration.GetValue<int>("Consumer:FlushIntervalMs", 50);
+            _instanceId = instanceId;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("OutboxConsumerService is starting with batchSize={BatchSize}, flushIntervalMs={FlushIntervalMs} (Avro format). Target: 1M msgs/min",
-                _batchSize, _flushIntervalMs);
+            _logger.LogInformation("OutboxConsumerService #{InstanceId} is starting with batchSize={BatchSize}, flushIntervalMs={FlushIntervalMs} (Avro format). Target: 1M msgs/min",
+                _instanceId, _batchSize, _flushIntervalMs);
             try
             {
                 InitializeConsumer();
@@ -103,8 +106,8 @@ namespace MyDotNetApp.Services
                             {
                                 var throughput = (totalConsumed / statsStopwatch.Elapsed.TotalSeconds);
                                 _logger.LogInformation(
-                                    "Avro Consumer | Throughput: {ThroughputPerSec:F0} msg/sec ({ThroughputPerMin:F0} msg/min) | Total: {TotalConsumed} msgs in {TotalBatches} batches",
-                                    throughput, throughput * 60, totalConsumed, totalBatches);
+                                    "Avro Consumer #{InstanceId} | Throughput: {ThroughputPerSec:F0} msg/sec ({ThroughputPerMin:F0} msg/min) | Total: {TotalConsumed} msgs in {TotalBatches} batches",
+                                    _instanceId, throughput, throughput * 60, totalConsumed, totalBatches);
                                 totalConsumed = 0;
                                 totalBatches = 0;
                                 statsStopwatch.Restart();
@@ -218,8 +221,8 @@ namespace MyDotNetApp.Services
                     .Build();
 
                 _consumer.Subscribe(_kafkaSettings.TopicName);
-                _logger.LogInformation("Consumer subscribed to topic: {Topic} with ultra-high-throughput Avro configuration. 1M+ msgs/min", 
-                    _kafkaSettings.TopicName);
+                _logger.LogInformation("Consumer #{InstanceId} subscribed to topic: {Topic} with ultra-high-throughput Avro configuration. 1M+ msgs/min", 
+                    _instanceId, _kafkaSettings.TopicName);
             }
             catch (Exception ex)
             {
@@ -246,7 +249,7 @@ namespace MyDotNetApp.Services
                 var messageIds = messageBatch.Select(m => m.MessageId).ToList();
                 var timestamp = messageBatch.First().ReceivedAt; // Use first message's timestamp for all
 
-                _logger.LogInformation("Flushing batch of {MessageCount} messages to Outbox table", messageBatch.Count);
+                _logger.LogInformation("Consumer #{InstanceId} flushing batch of {MessageCount} messages to Outbox table", _instanceId, messageBatch.Count);
 
                 // Use the new batch method that performs a single database operation
                 await _outboxService.MarkMessagesAsReceivedBatchAsync(messageIds, timestamp, stoppingToken);
