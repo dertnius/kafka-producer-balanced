@@ -107,6 +107,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("Starting Scaled Kafka Outbox Processor Service");
+        _metrics.LogMemoryStartup(_logger);
         await base.StartAsync(cancellationToken);
     }
 
@@ -598,6 +599,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
     {
         _logger.LogInformation("Stopping Scaled Kafka Outbox Processor Service");
         _metrics.LogMetrics(_logger);
+        _metrics.LogMemoryShutdown(_logger);
         
         await base.StopAsync(cancellationToken);
     }
