@@ -164,14 +164,14 @@ namespace MyDotNetApp.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error in OutboxConsumerService");
-                throw;
+                _logger.LogError(ex, "Unexpected error in OutboxConsumerService #{InstanceId} - service will attempt to restart", _instanceId);
+                // Don't rethrow - BackgroundService will handle restart on IIS
             }
             finally
             {
                 _consumer?.Close();
                 _consumer?.Dispose();
-                _logger.LogInformation("OutboxConsumerService has stopped.");
+                _logger.LogInformation("OutboxConsumerService #{InstanceId} has stopped.", _instanceId);
             }
         }
 

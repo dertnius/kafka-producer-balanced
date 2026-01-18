@@ -108,15 +108,27 @@ public class OutboxProcessorServiceScaled : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Executing Scaled Kafka Outbox Processor Service");
+        _logger.LogInformation("OutboxProcessorServiceScaled is starting");
         
-        // Start background tasks
-        var pollingTask = PollOutboxAsync(stoppingToken);
-        var producingTask = ProduceMessagesAsync(stoppingToken);
-        var cleanupTask = CleanupStidLocksAsync(stoppingToken);
-        var metricsTask = ReportMetricsAsync(stoppingToken);
+        try
+        {
+            // Start background tasks
+            var pollingTask = PollOutboxAsync(stoppingToken);
+            var producingTask = ProduceMessagesAsync(stoppingToken);
+            var cleanupTask = CleanupStidLocksAsync(stoppingToken);
+            var metricsTask = ReportMetricsAsync(stoppingToken);
 
-        await Task.WhenAll(pollingTask, producingTask, metricsTask, cleanupTask);
+            await Task.WhenAll(pollingTask, producingTask, metricsTask, cleanupTask);
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogInformation("OutboxProcessorServiceScaled cancelled");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error in OutboxProcessorServiceScaled - service will attempt to restart");
+            // Don't rethrow - let host manager restart if needed
+        }
     }
 
     /// <summary>
