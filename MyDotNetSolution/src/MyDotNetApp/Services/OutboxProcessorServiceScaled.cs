@@ -38,7 +38,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
     private readonly SemaphoreSlim _databaseSemaphore;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _mortgageStidLocks;
     private readonly ConcurrentDictionary<string, long> _stidLastUsed;
-    private readonly ConcurrentDictionary<long, byte> _inFlightMessages; // Track messages already in channel/processing
+    private readonly ConcurrentDictionary<long, long> _inFlightMessages; // Track messages with timestamp (TickCount64)
     private PerformanceMetrics _metrics;
 
     public OutboxProcessorServiceScaled(
@@ -58,7 +58,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
         _databaseSemaphore = new SemaphoreSlim(_kafkaSettings.DatabaseConnectionPoolSize);
         _mortgageStidLocks = new ConcurrentDictionary<string, SemaphoreSlim>();
         _stidLastUsed = new ConcurrentDictionary<string, long>();
-        _inFlightMessages = new ConcurrentDictionary<long, byte>(); // byte is dummy value (minimal memory)
+        _inFlightMessages = new ConcurrentDictionary<long, long>(); // Track with timestamp for cleanup
         _processingChannel = Channel.CreateBounded<OutboxMessage>(
             new BoundedChannelOptions(_kafkaSettings.MaxProducerBuffer)
             {
@@ -198,7 +198,8 @@ public class OutboxProcessorServiceScaled : BackgroundService
                 foreach (var message in messages)
                 {
                     // Check if message is already in channel or being processed
-                    if (_inFlightMessages.TryAdd(message.Id, 0))
+                    // Store timestamp for cleanup tracking
+                    if (_inFlightMessages.TryAdd(message.Id, Environment.TickCount64))
                     {
                         await _processingChannel.Writer.WriteAsync(message, stoppingToken);
                         addedCount++;
@@ -523,13 +524,17 @@ public class OutboxProcessorServiceScaled : BackgroundService
     private async Task CleanupStidLocksAsync(CancellationToken stoppingToken)
     {
         const int cleanupIntervalMs = 60000; // 60s
-        const long idleThresholdMs = 120000; // 120s
+        const long idleThresholdMs = 120000; // 120s (2 minutes)
+        
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 await Task.Delay(cleanupIntervalMs, stoppingToken);
                 var now = Environment.TickCount64;
+                
+                // Cleanup idle STID locks
+                var removedLocks = 0;
                 foreach (var kvp in _stidLastUsed.ToArray())
                 {
                     var idleMs = now - kvp.Value;
@@ -541,10 +546,29 @@ public class OutboxProcessorServiceScaled : BackgroundService
                             {
                                 removed.Dispose();
                                 _stidLastUsed.TryRemove(kvp.Key, out _);
+                                removedLocks++;
                             }
                         }
                     }
                 }
+                
+                // Log memory stats every cleanup cycle
+                var inFlightCount = _inFlightMessages.Count;
+                var stidLockCount = _mortgageStidLocks.Count;
+                
+                if (removedLocks > 0)
+                {
+                    _logger.LogInformation("Cleaned up {RemovedLocks} idle STID locks", removedLocks);
+                }
+                
+                _logger.LogDebug(
+                    "Memory stats: {InFlightCount} in-flight messages, {StidLockCount} STID locks",
+                    inFlightCount, stidLockCount);
+                    
+                // WARNING: Do NOT clean up _inFlightMessages by time!
+                // Messages can legitimately wait in channel during backlog.
+                // They are removed when processed (success or failure).
+                // Only a crash or app restart should clear in-flight tracking.
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -552,7 +576,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during STID locks cleanup");
+                _logger.LogError(ex, "Error during cleanup");
             }
         }
     }
