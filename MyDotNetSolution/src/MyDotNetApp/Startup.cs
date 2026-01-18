@@ -95,6 +95,15 @@ public class Startup
                 kafkaService,
                 publishBatchHandler);
         });
+
+        // Register outbox consumer background service
+        // This service reads from the same Kafka topic and updates Outbox table with received timestamps
+        services.AddHostedService(sp =>
+            new OutboxConsumerService(
+                sp.GetRequiredService<ILogger<OutboxConsumerService>>(),
+                sp.GetRequiredService<IOutboxService>(),
+                sp.GetRequiredService<IConfiguration>(),
+                sp.GetRequiredService<IOptions<KafkaOutboxSettings>>()));
     }
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILogger<Startup> logger)
