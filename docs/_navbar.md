@@ -1,17 +1,21 @@
 <!-- Top navigation bar -->
 
-* **Documentation**
+* **Main**
   * [Home](/)
-  * [Quick Start](QUICK_REFERENCE.md)
-  * [Memory Guide](MEMORY_VISUAL_GUIDE.md)
+  * [README](README.md)
+  * [Quick Reference](QUICK_REFERENCE.md)
 
-* **Sections**
-  * [🧠 Memory Tracking](MEMORY_TRACKING.md)
+* **Core Topics**
+  * [🧠 Memory](MEMORY_TRACKING.md)
+  * [📨 Consumer](CONSUMER_ARCHITECTURE.md)
   * [📤 Publishing](PUBLISHING_FEATURE_GUIDE.md)
-  * [🚀 Deployment](PRODUCTION_GUIDE.md)
-  * [📚 All Docs](DOCUMENTATION_INDEX.md)
+  * [🚀 Production](PRODUCTION_GUIDE.md)
 
-* **Resources**
-  * [GitHub](#)
-  * [Issues](#)
-  * [GitHub Pages Setup Guide](#/docs/GITHUB_PAGES_SETUP.md)
+* **Reference**
+  * [📚 All Docs](DOCUMENTATION_INDEX.md)
+  * [Implementation](IMPLEMENTATION_SUMMARY.md)
+  * [Database Schema](DATABASE_SCHEMA.sql)
+
+* **External**
+  * [GitHub](https://github.com/dertnius/kafka-producer-balanced)
+  * [Issues](https://github.com/dertnius/kafka-producer-balanced/issues)

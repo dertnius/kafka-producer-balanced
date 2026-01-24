@@ -19,16 +19,16 @@
 
 * **Consumer** 📨
   * [Architecture](CONSUMER_ARCHITECTURE.md)
-  * [Implementation](CONSUMER_IMPLEMENTATION_SUMMARY.md)
+  * [Implementation Summary](CONSUMER_IMPLEMENTATION_SUMMARY.md)
   * [Quick Reference](CONSUMER_QUICK_REFERENCE.md)
   * [Performance Guide](CONSUMER_PERFORMANCE_GUIDE.md)
   * [Visual Summary](CONSUMER_VISUAL_SUMMARY.md)
   * [Complete Guide](CONSUMER_COMPLETE.md)
   * [Ready Status](CONSUMER_READY.md)
 
-* **Features & Publishing** 📤
-  * [Publishing Feature Guide](PUBLISHING_FEATURE_GUIDE.md)
-  * [Publishing Implementation](PUBLISHING_IMPLEMENTATION.md)
+* **Publishing** 📤
+  * [Feature Guide](PUBLISHING_FEATURE_GUIDE.md)
+  * [Implementation](PUBLISHING_IMPLEMENTATION.md)
   * [README Publishing](README_PUBLISHING.md)
 
 * **Operations & Deployment** 🛠️
@@ -42,19 +42,20 @@
   * [Million Records Optimization](MILLION_RECORDS_OPTIMIZATION.md)
   * [Optimization Complete](OPTIMIZATION_COMPLETE.md)
   * [Testing Commands](TESTING_COMMANDS.md)
+  * [Test Report](TEST_REPORT.md)
   * [Error Handling Analysis](ERROR_HANDLING_ANALYSIS.md)
 
-* **Documentation** 📚
+* **Documentation & Reference** 📚
   * [Documentation Index](DOCUMENTATION_INDEX.md)
   * [Implementation Summary](IMPLEMENTATION_SUMMARY.md)
   * [Completion Summary](COMPLETION_SUMMARY.md)
   * [Verification Complete](VERIFICATION_COMPLETE.md)
   * [GitHub Pages Setup](GITHUB_PAGES_SETUP.md)
 
-* **Database & Architecture** 🏗️
+* **Architecture & Data** 🏗️
   * [Database Schema](DATABASE_SCHEMA.sql)
   * [Mermaid Diagrams](mermaid.md)
 
-* **Resources**
+* **External Links**
   * [GitHub Repository](https://github.com/dertnius/kafka-producer-balanced)
   * [Issues & Support](https://github.com/dertnius/kafka-producer-balanced/issues)
