@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knapsack Tests Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-danger {
+            background: #f093fb;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #da5fe5;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .filters {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .filter-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+            display: block;
+        }
+        
+        select, input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .card-title {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #667eea;
+            margin: 10px 0;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin-top: 20px;
+        }
+        
+        .test-list {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-top: 30px;
+        }
+        
+        .test-item {
+            padding: 15px;
+            border-left: 4px solid #e0e0e0;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+        
+        .test-item:hover {
+            background: #f8f9fa;
+            border-left-color: #667eea;
+        }
+        
+        .test-item.passed {
+            border-left-color: #28a745;
+            background: #f0fff4;
+        }
+        
+        .test-item.failed {
+            border-left-color: #dc3545;
+            background: #fff5f5;
+        }
+        
+        .test-item.running {
+            border-left-color: #ffc107;
+            background: #fffbf0;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        .test-name {
+            font-weight: 600;
+            color: #333;
+            flex: 1;
+        }
+        
+        .test-status {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.85em;
+            margin-right: 10px;
+        }
+        
+        .status-passed {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-running {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .test-time {
+            color: #666;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .status-indicator.running {
+            background: #ffc107;
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .status-indicator.passed {
+            background: #28a745;
+        }
+        
+        .status-indicator.failed {
+            background: #dc3545;
+        }
+        
+        .console-output {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .console-line {
+            margin-bottom: 5px;
+        }
+        
+        .console-error {
+            color: #f48771;
+        }
+        
+        .console-success {
+            color: #89d185;
+        }
+        
+        .console-warning {
+            color: #dcdcaa;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-card.success {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+        
+        .stat-card.danger {
+            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+        }
+        
+        .stat-card.warning {
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        
+        .status-badge.idle {
+            background: #e0e0e0;
+            color: #666;
+        }
+        
+        .status-badge.running {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-badge.completed {
+            background: #d4edda;
+            color: #155724;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 Knapsack Tests Dashboard</h1>
+            <p class="subtitle">Real-time test execution monitor with dynamic visualization</p>
+            
+            <div class="controls">
+                <button class="btn-primary" onclick="startTests()">▶️ Start Tests (Simulated)</button>
+                <button class="btn-danger" onclick="stopTests()">⏹️ Stop Tests</button>
+                <button class="btn-secondary" onclick="resetDashboard()">🔄 Reset</button>
+                <button class="btn-primary" onclick="startApiTests()">🧪 Run dotnet tests</button>
+                <button class="btn-danger" onclick="stopApiTests()">🛑 Stop API Run</button>
+            </div>
+        </header>
+        
+        <div class="filters">
+            <h3 style="margin-bottom: 15px;">Selection Criteria</h3>
+            <div style="margin-bottom:10px;color:#666;">API: <span id="apiStatus">Disconnected</span></div>
+            <div class="filter-group">
+                <div>
+                    <label>Test Category</label>
+                    <select id="testCategory" onchange="updateTests()">
+                        <option value="all">All Tests</option>
+                        <option value="ZeroOneKnapsack">Zero-One Knapsack</option>
+                        <option value="Wikipedia">Wikipedia Solver</option>
+                        <option value="Comparison">Comparison Tests</option>
+                        <option value="PerSolver">Per Solver Tests</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Verbosity Level</label>
+                    <select id="verbosity">
+                        <option value="minimal">Minimal</option>
+                        <option value="detailed">Detailed</option>
+                        <option value="quiet">Quiet</option>
+                    </select>
+                </div>
+                <div>
+                    <label>Max Parallel Tests</label>
+                    <input type="number" id="parallelCount" value="1" min="1" max="8">
+                </div>
+            </div>
+        </div>
+        
+        <div class="dashboard">
+            <div class="card">
+                <div class="card-title">📊 Overall Progress</div>
+                <div class="stat-value" id="progressPercent">0%</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                </div>
+                <div class="stat-label" style="margin-top: 10px;">
+                    <span id="currentTest">Waiting to start...</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">✅ Test Results</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <div class="stat-label">Passed</div>
+                        <div class="stat-value" style="color: #28a745;" id="passedCount">0</div>
+                    </div>
+                    <div>
+                        <div class="stat-label">Failed</div>
+                        <div class="stat-value" style="color: #dc3545;" id="failedCount">0</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-title">⏱️ Timing</div>
+                <div>
+                    <div class="stat-label">Elapsed Time</div>
+                    <div class="stat-value" id="elapsedTime">0s</div>
+                </div>
+                <div style="margin-top: 10px;">
+                    <div class="stat-label">Estimated Remaining</div>
+                    <div style="font-size: 1.3em; color: #666;" id="remainingTime">--</div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-bottom: 30px;">
+            <div class="card">
+                <div class="chart-container">
+                    <canvas id="resultsChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="chart-container">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="stats-grid">
+            <div class="stat-card success">
+                <div style="font-size: 0.9em; opacity: 0.9;">Success Rate</div>
+                <div style="font-size: 2em; font-weight: bold;" id="successRate">0%</div>
+            </div>
+            <div class="stat-card">
+                <div style="font-size: 0.9em; opacity: 0.9;">Avg Time/Test</div>
+                <div style="font-size: 2em; font-weight: bold;" id="avgTime">0ms</div>
+            </div>
+            <div class="stat-card warning">
+                <div style="font-size: 0.9em; opacity: 0.9;">Total Tests</div>
+                <div style="font-size: 2em; font-weight: bold;" id="totalTests">18</div>
+            </div>
+            <div class="stat-card">
+                <div style="font-size: 0.9em; opacity: 0.9;">Status</div>
+                <span class="status-badge idle" id="statusBadge">IDLE</span>
+            </div>
+        </div>
+        
+        <div class="test-list">
+            <h3 style="margin-bottom: 20px;">🧪 Test Details</h3>
+            <div id="testsList"></div>
+        </div>
+        
+        <div class="card" style="margin-top: 30px;">
+            <h3 style="margin-bottom: 15px;">📝 Console Output</h3>
+            <div class="console-output" id="consoleOutput">
+<span class="console-warning">Ready to execute tests...</span>
+                <span class="console-line">Use 'Start Tests' button to begin execution</span>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const mockTests = [
+            { name: 'ZeroOneKnapsackSolver_SmallCapacity_SelectsOptimal', category: 'ZeroOneKnapsack' },
+            { name: 'ZeroOneKnapsackSolver_MediumCapacity_OptimizesWeight', category: 'ZeroOneKnapsack' },
+            { name: 'ZeroOneKnapsackSolver_LargeCapacity_HandlesScaling', category: 'ZeroOneKnapsack' },
+            { name: 'KnapsackWikipediaSolver_BasicTest_MatchesExpected', category: 'Wikipedia' },
+            { name: 'KnapsackWikipediaSolver_EdgeCase_EmptyList', category: 'Wikipedia' },
+            { name: 'KnapsackWikipediaSolver_EdgeCase_ZeroCapacity', category: 'Wikipedia' },
+            { name: 'KnapsackComparison_BothSolvers_ProduceSameResult', category: 'Comparison' },
+            { name: 'KnapsackComparison_Performance_ComparisonValid', category: 'Comparison' },
+            { name: 'KnapsackPerSolver_ZeroOne_AllTests', category: 'PerSolver' },
+            { name: 'KnapsackPerSolver_Wikipedia_AllTests', category: 'PerSolver' },
+            { name: 'KnapsackPerSolver_Performance_Both', category: 'PerSolver' },
+            { name: 'KnapsackAlgorithm_Correctness_ZeroOne', category: 'Comparison' },
+            { name: 'KnapsackAlgorithm_Correctness_Wikipedia', category: 'Comparison' },
+            { name: 'KnapsackAlgorithm_Performance_Scaling', category: 'Comparison' },
+            { name: 'KnapsackAlgorithm_EdgeCases_Boundaries', category: 'PerSolver' },
+            { name: 'KnapsackAlgorithm_EdgeCases_Empty', category: 'PerSolver' },
+            { name: 'KnapsackAlgorithm_EdgeCases_Single', category: 'PerSolver' },
+            { name: 'KnapsackAlgorithm_Integration_EndToEnd', category: 'PerSolver' }
+        ];
+        
+        let testState = {
+            running: false,
+            tests: [],
+            passed: 0,
+            failed: 0,
+            startTime: null,
+            currentIndex: 0
+        };
+        
+        let resultsChart = null;
+        let performanceChart = null;
+        
+        function initCharts() {
+            const ctx1 = document.getElementById('resultsChart').getContext('2d');
+            resultsChart = new Chart(ctx1, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Passed', 'Failed', 'Pending'],
+                    datasets: [{
+                        data: [0, 0, 18],
+                        backgroundColor: ['#28a745', '#dc3545', '#e0e0e0'],
+                        borderColor: ['white', 'white', 'white'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            
+            const ctx2 = document.getElementById('performanceChart').getContext('2d');
+            performanceChart = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: ['Test 1', 'Test 2', 'Test 3'],
+                    datasets: [{
+                        label: 'Duration (ms)',
+                        data: [45, 38, 52],
+                        backgroundColor: '#667eea',
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y',
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderTests() {
+            const category = document.getElementById('testCategory').value;
+            const filtered = category === 'all' ? mockTests : mockTests.filter(t => t.category === category);
+            
+            const html = filtered.map((test, i) => `
+                <div class="test-item ${testState[test.name] || 'pending'}">
+                    <div>
+                        <span class="status-indicator ${testState[test.name] || 'pending'}"></span>
+                        <span class="test-name">${test.name}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="test-status status-${testState[test.name] || 'pending'}">${(testState[test.name] || 'pending').toUpperCase()}</span>
+                        <span class="test-time" id="time-${test.name}">--</span>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('testsList').innerHTML = html;
+        }
+        
+        function updateProgress() {
+            const total = 18;
+            const progress = ((testState.passed + testState.failed) / total) * 100;
+            document.getElementById('progressPercent').textContent = Math.round(progress) + '%';
+            document.getElementById('progressFill').style.width = progress + '%';
+            document.getElementById('passedCount').textContent = testState.passed;
+            document.getElementById('failedCount').textContent = testState.failed;
+            document.getElementById('successRate').textContent = testState.passed + testState.failed > 0 
+                ? Math.round((testState.passed / (testState.passed + testState.failed)) * 100) + '%'
+                : '0%';
+            
+            if (resultsChart) {
+                resultsChart.data.datasets[0].data = [testState.passed, testState.failed, 18 - testState.passed - testState.failed];
+                resultsChart.update();
+            }
+        }
+        
+        function updateElapsedTime() {
+            if (testState.startTime) {
+                const elapsed = Math.round((Date.now() - testState.startTime) / 1000);
+                document.getElementById('elapsedTime').textContent = elapsed + 's';
+            }
+        }
+        
+        function addConsoleLog(message, type = 'info') {
+            const output = document.getElementById('consoleOutput');
+            const timestamp = new Date().toLocaleTimeString();
+            const line = document.createElement('div');
+            line.className = 'console-line console-' + type;
+            line.textContent = `[${timestamp}] ${message}`;
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        function startTests() {
+            if (testState.running) return;
+            
+            testState.running = true;
+            testState.passed = 0;
+            testState.failed = 0;
+            testState.startTime = Date.now();
+            testState.currentIndex = 0;
+            
+            document.getElementById('statusBadge').className = 'status-badge running';
+            document.getElementById('statusBadge').textContent = 'RUNNING';
+            document.getElementById('consoleOutput').innerHTML = '';
+            
+            addConsoleLog('Starting test execution...', 'success');
+            addConsoleLog('Connecting to test runner...', 'warning');
+            
+            runNextTest();
+        }
+        
+        function runNextTest() {
+            if (!testState.running || testState.currentIndex >= mockTests.length) {
+                completeTests();
+                return;
+            }
+            
+            const test = mockTests[testState.currentIndex];
+            document.getElementById('currentTest').textContent = test.name;
+            
+            const duration = Math.random() * 100 + 30;
+            const passed = Math.random() > 0.1;
+            
+            addConsoleLog(`Running: ${test.name}...`, 'warning');
+            
+            setTimeout(() => {
+                testState[test.name] = passed ? 'passed' : 'failed';
+                if (passed) {
+                    testState.passed++;
+                    addConsoleLog(`✓ PASSED: ${test.name} (${Math.round(duration)}ms)`, 'success');
+                } else {
+                    testState.failed++;
+                    addConsoleLog(`✗ FAILED: ${test.name} (${Math.round(duration)}ms)`, 'error');
+                }
+                
+                document.getElementById(`time-${test.name}`).textContent = Math.round(duration) + 'ms';
+                updateProgress();
+                renderTests();
+                updateElapsedTime();
+                
+                testState.currentIndex++;
+                setTimeout(runNextTest, 500);
+            }, duration * 10);
+        }
+        
+        function completeTests() {
+            testState.running = false;
+            document.getElementById('statusBadge').className = 'status-badge completed';
+            document.getElementById('statusBadge').textContent = 'COMPLETED';
+            addConsoleLog('All tests completed!', 'success');
+            addConsoleLog(`Summary: ${testState.passed} passed, ${testState.failed} failed`, 'success');
+        }
+        
+        function stopTests() {
+            testState.running = false;
+            document.getElementById('statusBadge').className = 'status-badge idle';
+            document.getElementById('statusBadge').textContent = 'STOPPED';
+            addConsoleLog('Tests stopped by user', 'warning');
+        }
+        
+        function resetDashboard() {
+            testState = { running: false, tests: [], passed: 0, failed: 0, startTime: null, currentIndex: 0 };
+            document.getElementById('statusBadge').className = 'status-badge idle';
+            document.getElementById('statusBadge').textContent = 'IDLE';
+            document.getElementById('elapsedTime').textContent = '0s';
+            document.getElementById('progressPercent').textContent = '0%';
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('consoleOutput').innerHTML = '<span class="console-warning">Ready to execute tests...</span>';
+            updateProgress();
+            renderTests();
+        }
+        
+        function updateTests() {
+            renderTests();
+        }
+        
+        // Initialize
+        initCharts();
+        renderTests();
+        
+        // Update elapsed time every second
+        setInterval(updateElapsedTime, 1000);
+
+        // ---- dotnet test API integration ----
+        const API_BASE = 'http://localhost:5055';
+        let apiPoll = null;
+
+        async function pingApi() {
+            try {
+                const res = await fetch(API_BASE + '/status');
+                if (!res.ok) throw new Error('status ' + res.status);
+                const json = await res.json();
+                document.getElementById('apiStatus').textContent = 'Connected';
+                return json;
+            } catch (e) {
+                document.getElementById('apiStatus').textContent = 'Disconnected';
+                return null;
+            }
+        }
+
+        async function startApiTests() {
+            const ping = await pingApi();
+            if (!ping) {
+                addConsoleLog('API not reachable on localhost:5055. Start MyDotNetSolution/scripts/knapsack-test-api.ps1.', 'warning');
+                return;
+            }
+            addConsoleLog('Starting dotnet test (Knapsack) via API...', 'success');
+            const res = await fetch(API_BASE + '/run', { method: 'POST' });
+            if (!res.ok) { addConsoleLog('Failed to start API run', 'error'); return; }
+            if (apiPoll) clearInterval(apiPoll);
+            testState.running = true;
+            document.getElementById('statusBadge').className = 'status-badge running';
+            document.getElementById('statusBadge').textContent = 'RUNNING';
+            apiPoll = setInterval(async () => {
+                const status = await pingApi();
+                if (!status) return;
+                if (status.state === 'completed' || status.state === 'stopped') {
+                    clearInterval(apiPoll);
+                    testState.running = false;
+                    const resultsRes = await fetch(API_BASE + '/results');
+                    const payload = await resultsRes.json();
+                    renderApiResults(payload);
+                    document.getElementById('statusBadge').className = 'status-badge ' + (status.state === 'completed' ? 'completed' : 'idle');
+                    document.getElementById('statusBadge').textContent = (status.state === 'completed' ? 'COMPLETED' : 'STOPPED');
+                    addConsoleLog('dotnet test ' + status.state, 'success');
+                }
+            }, 1000);
+        }
+
+        async function stopApiTests() {
+            try {
+                const res = await fetch(API_BASE + '/stop', { method: 'POST' });
+                if (apiPoll) clearInterval(apiPoll);
+                testState.running = false;
+                document.getElementById('statusBadge').className = 'status-badge idle';
+                document.getElementById('statusBadge').textContent = 'STOPPED';
+                addConsoleLog('Stop requested to API', 'warning');
+            } catch {}
+        }
+
+        function renderApiResults(payload) {
+            if (!payload || payload.error) {
+                addConsoleLog('No results available yet', 'warning');
+                return;
+            }
+            const items = payload.results || [];
+            const passed = items.filter(x => x.outcome === 'Passed');
+            const failed = items.filter(x => x.outcome !== 'Passed');
+            testState.passed = passed.length;
+            testState.failed = failed.length;
+            updateProgress();
+
+            // update charts
+            if (resultsChart) {
+                resultsChart.data.datasets[0].data = [passed.length, failed.length, Math.max(0, 18 - passed.length - failed.length)];
+                resultsChart.update();
+            }
+
+            // render test list from payload
+            const html = items.map(x => {
+                const ok = x.outcome === 'Passed';
+                return `
+                <div class="test-item ${ok ? 'passed' : 'failed'}">
+                    <div>
+                        <span class="status-indicator ${ok ? 'passed' : 'failed'}"></span>
+                        <span class="test-name">${x.testName}</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <span class="test-status ${ok ? 'status-passed' : 'status-failed'}">${x.outcome.toUpperCase()}</span>
+                        <span class="test-time">${x.duration || '--'}</span>
+                    </div>
+                </div>`;
+            }).join('');
+            document.getElementById('testsList').innerHTML = html || '<div class="test-item">No results</div>';
+
+            addConsoleLog(`Results: ${passed.length} passed, ${failed.length} other`, 'success');
+        }
+
+        // try ping API on load
+        pingApi();
+    </script>
+</body>
+</html>

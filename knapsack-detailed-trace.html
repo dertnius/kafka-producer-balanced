@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knapsack Algorithm Detailed Trace</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            font-size: 1.3em;
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        
+        .knapsack-state {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .capacity-bar {
+            background: #e0e0e0;
+            height: 40px;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+        
+        .capacity-used {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 10px;
+            color: white;
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        
+        .capacity-remaining {
+            flex: 1;
+            padding: 10px;
+            color: #666;
+            font-size: 0.9em;
+            text-align: right;
+        }
+        
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 0.95em;
+        }
+        
+        .items-table thead {
+            background: #667eea;
+            color: white;
+        }
+        
+        .items-table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        .items-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .items-table tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .item-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .item-id {
+            background: #667eea;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+        
+        .status-selected {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-rejected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .reason-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .reason-fit {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .reason-capacity {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .reason-value {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .reason-replacing {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .step-log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 10px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        
+        .step-log div {
+            margin-bottom: 8px;
+            padding: 8px;
+            border-left: 3px solid #667eea;
+            padding-left: 12px;
+        }
+        
+        .step-log .step-selected {
+            border-left-color: #28a745;
+            color: #89d185;
+        }
+        
+        .step-log .step-rejected {
+            border-left-color: #dc3545;
+            color: #f48771;
+        }
+        
+        .step-log .step-replaced {
+            border-left-color: #ffc107;
+            color: #dcdcaa;
+        }
+        
+        .step-log .step-info {
+            border-left-color: #667eea;
+            color: #b4d7ff;
+        }
+        
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+        
+        .stat.success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+        
+        .stat.warning {
+            background: linear-gradient(135deg, #ffc107, #fd7e14);
+        }
+        
+        .stat.info {
+            background: linear-gradient(135deg, #17a2b8, #20c997);
+        }
+        
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 1200px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            .two-column {
+                grid-template-columns: 1fr;
+            }
+            .summary-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .decision-tree {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+        
+        .decision-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid #667eea;
+            padding-left: 15px;
+        }
+        
+        .selected-list {
+            background: #d4edda;
+            border-left-color: #28a745;
+        }
+        
+        .rejected-list {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        
+        .tooltip {
+            position: relative;
+            cursor: help;
+            text-decoration: underline dotted;
+        }
+        
+        .tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            white-space: nowrap;
+            z-index: 1000;
+            font-size: 0.85em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Knapsack Algorithm - Detailed Item Selection Trace</h1>
+            <p style="color: #666; margin-bottom: 20px;">Watch each mortgage/asset as it's evaluated and see why it was selected or rejected</p>
+            <div class="controls">
+                <button class="btn-primary" onclick="runAlgorithm()">▶️ Run Algorithm</button>
+                <button class="btn-primary" onclick="stepThrough()">⏭️ Step Through</button>
+                <button class="btn-primary" onclick="resetTrace()">🔄 Reset</button>
+            </div>
+        </header>
+        
+        <div class="summary-stats">
+            <div class="stat">
+                <div class="stat-value" id="totalItems">25</div>
+                <div class="stat-label">Total Items</div>
+            </div>
+            <div class="stat success">
+                <div class="stat-value" id="selectedItems">0</div>
+                <div class="stat-label">Selected</div>
+            </div>
+            <div class="stat warning">
+                <div class="stat-value" id="rejectedItems">0</div>
+                <div class="stat-label">Rejected</div>
+            </div>
+            <div class="stat info">
+                <div class="stat-value" id="totalValue">$0</div>
+                <div class="stat-label">Total Value</div>
+            </div>
+        </div>
+        
+        <div class="main-grid">
+            <div class="card">
+                <h2>📦 Knapsack State</h2>
+                <div class="knapsack-state">
+                    <div><strong>Capacity:</strong> <span id="capacity">500</span> units</div>
+                    <div><strong>Used:</strong> <span id="used">0</span> / <span id="capacity2">500</span></div>
+                    <div><strong>Remaining:</strong> <span id="remaining">500</span> units</div>
+                    <div class="capacity-bar">
+                        <div class="capacity-used" id="capacityBar" style="width: 0%">
+                            <span id="percentUsed">0%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>⏱️ Execution Summary</h2>
+                <div class="knapsack-state">
+                    <div><strong>Algorithm:</strong> Zero-One Knapsack (DP)</div>
+                    <div><strong>Status:</strong> <span id="status">Idle</span></div>
+                    <div><strong>Processing Time:</strong> <span id="procTime">0ms</span></div>
+                    <div><strong>Efficiency:</strong> <span id="efficiency">0%</span></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="two-column">
+            <div class="card">
+                <h2>✅ Selected Items</h2>
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Name</th>
+                            <th>Weight</th>
+                            <th>Value</th>
+                            <th>Ratio</th>
+                        </tr>
+                    </thead>
+                    <tbody id="selectedTable">
+                        <tr><td colspan="5" style="text-align: center; color: #999;">No items selected yet</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="card">
+                <h2>❌ Rejected Items</h2>
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>Item</th>
+                            <th>Name</th>
+                            <th>Weight</th>
+                            <th>Reason</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rejectedTable">
+                        <tr><td colspan="4" style="text-align: center; color: #999;">No items rejected yet</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card" style="margin-top: 30px;">
+            <h2>📋 Decision Log (Step-by-Step Trace)</h2>
+            <div class="step-log" id="stepLog">
+                <div class="step-info">Ready to run algorithm. Click 'Run Algorithm' or 'Step Through' to begin.</div>
+            </div>
+        </div>
+        
+        <div class="card" style="margin-top: 30px;">
+            <h2>🤔 Selection Criteria & Rules</h2>
+            <div class="decision-tree">
+                <div class="decision-item">
+                    <strong>1. Fit Check:</strong> Does item weight ≤ remaining capacity?
+                </div>
+                <div class="decision-item">
+                    <strong>2. Value Check:</strong> Does item provide good value ratio (value/weight)?
+                </div>
+                <div class="decision-item">
+                    <strong>3. Replacement Check:</strong> Could replacing a lower-value item improve total?
+                </div>
+                <div class="decision-item selected-list">
+                    <strong>✅ SELECTED:</strong> Fits capacity AND adds value without waste
+                </div>
+                <div class="decision-item rejected-list">
+                    <strong>❌ REJECTED:</strong> Doesn't fit OR would waste capacity OR better items exist
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const mockItems = [
+            { id: 1, name: 'Mortgage A', weight: 150, value: 300, type: 'MBS' },
+            { id: 2, name: 'Mortgage B', weight: 120, value: 250, type: 'MBS' },
+            { id: 3, name: 'Mortgage C', weight: 80, value: 180, type: 'Agency' },
+            { id: 4, name: 'Mortgage D', weight: 200, value: 350, type: 'Non-Agency' },
+            { id: 5, name: 'Mortgage E', weight: 90, value: 200, type: 'Agency' },
+            { id: 6, name: 'Mortgage F', weight: 110, value: 220, type: 'MBS' },
+            { id: 7, name: 'Mortgage G', weight: 100, value: 210, type: 'Agency' },
+            { id: 8, name: 'Mortgage H', weight: 160, value: 320, type: 'Non-Agency' },
+            { id: 9, name: 'Mortgage I', weight: 75, value: 160, type: 'MBS' },
+            { id: 10, name: 'Mortgage J', weight: 130, value: 260, type: 'Agency' },
+            { id: 11, name: 'Mortgage K', weight: 95, value: 190, type: 'MBS' },
+            { id: 12, name: 'Mortgage L', weight: 140, value: 280, type: 'Non-Agency' },
+            { id: 13, name: 'Mortgage M', weight: 85, value: 170, type: 'Agency' },
+            { id: 14, name: 'Mortgage N', weight: 125, value: 245, type: 'MBS' },
+            { id: 15, name: 'Mortgage O', weight: 105, value: 215, type: 'Agency' },
+            { id: 16, name: 'Mortgage P', weight: 115, value: 230, type: 'MBS' },
+            { id: 17, name: 'Mortgage Q', weight: 145, value: 290, type: 'Non-Agency' },
+            { id: 18, name: 'Mortgage R', weight: 70, value: 150, type: 'Agency' },
+            { id: 19, name: 'Mortgage S', weight: 170, value: 340, type: 'MBS' },
+            { id: 20, name: 'Mortgage T', weight: 60, value: 140, type: 'Agency' },
+            { id: 21, name: 'Mortgage U', weight: 180, value: 360, type: 'Non-Agency' },
+            { id: 22, name: 'Mortgage V', weight: 65, value: 155, type: 'MBS' },
+            { id: 23, name: 'Mortgage W', weight: 135, value: 270, type: 'Agency' },
+            { id: 24, name: 'Mortgage X', weight: 50, value: 130, type: 'MBS' },
+            { id: 25, name: 'Mortgage Y', weight: 190, value: 380, type: 'Non-Agency' }
+        ];
+        
+        let state = {
+            capacity: 500,
+            used: 0,
+            selected: [],
+            rejected: [],
+            startTime: null,
+            step: 0
+        };
+        
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('stepLog');
+            const div = document.createElement('div');
+            div.className = `step-${type}`;
+            div.textContent = `[${state.step}] ${message}`;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+            state.step++;
+        }
+        
+        function updateUI() {
+            const remaining = state.capacity - state.used;
+            const percent = Math.round((state.used / state.capacity) * 100);
+            
+            document.getElementById('selectedItems').textContent = state.selected.length;
+            document.getElementById('rejectedItems').textContent = state.rejected.length;
+            document.getElementById('used').textContent = state.used;
+            document.getElementById('capacity2').textContent = state.capacity;
+            document.getElementById('remaining').textContent = remaining;
+            document.getElementById('capacityBar').style.width = percent + '%';
+            document.getElementById('percentUsed').textContent = percent + '%';
+            
+            const totalValue = state.selected.reduce((sum, id) => {
+                const item = mockItems.find(i => i.id === id);
+                return sum + item.value;
+            }, 0);
+            document.getElementById('totalValue').textContent = '$' + totalValue;
+            document.getElementById('efficiency').textContent = Math.round((totalValue / (state.capacity * 0.8)) * 100) + '%';
+            
+            renderTables();
+        }
+        
+        function renderTables() {
+            // Selected items
+            const selectedHtml = state.selected.map(id => {
+                const item = mockItems.find(i => i.id === id);
+                const ratio = (item.value / item.weight).toFixed(2);
+                return `<tr class="status-selected">
+                    <td><strong>#${item.id}</strong></td>
+                    <td>${item.name}</td>
+                    <td>${item.weight}</td>
+                    <td>$${item.value}</td>
+                    <td>${ratio}</td>
+                </tr>`;
+            }).join('');
+            
+            document.getElementById('selectedTable').innerHTML = selectedHtml || 
+                '<tr><td colspan="5" style="text-align: center; color: #999;">No items selected yet</td></tr>';
+            
+            // Rejected items
+            const rejectedHtml = state.rejected.map(id => {
+                const item = mockItems.find(i => i.id === id);
+                const reason = getRejectionReason(id);
+                return `<tr class="status-rejected">
+                    <td><strong>#${item.id}</strong></td>
+                    <td>${item.name}</td>
+                    <td>${item.weight}</td>
+                    <td><span class="reason-badge ${reason.class}">${reason.text}</span></td>
+                </tr>`;
+            }).join('');
+            
+            document.getElementById('rejectedTable').innerHTML = rejectedHtml || 
+                '<tr><td colspan="4" style="text-align: center; color: #999;">No items rejected yet</td></tr>';
+        }
+        
+        function getRejectionReason(id) {
+            const item = mockItems.find(i => i.id === id);
+            const remaining = state.capacity - state.used;
+            
+            if (item.weight > remaining) {
+                return { text: 'No Capacity', class: 'reason-capacity' };
+            }
+            return { text: 'Low Value Ratio', class: 'reason-value' };
+        }
+        
+        function processItem(itemId) {
+            const item = mockItems.find(i => i.id === itemId);
+            const remaining = state.capacity - state.used;
+            
+            addLog(`Evaluating ${item.name} (ID: ${item.id}, Weight: ${item.weight}, Value: $${item.value})`);
+            
+            if (item.weight > remaining) {
+                addLog(`❌ REJECTED: Insufficient capacity (needs ${item.weight}, have ${remaining})`);
+                state.rejected.push(itemId);
+            } else {
+                const currentRatio = item.value / item.weight;
+                const wouldFit = state.selected.every(id => {
+                    return mockItems.find(i => i.id === id).weight + item.weight <= state.capacity;
+                });
+                
+                if (wouldFit && currentRatio > 1.5) {
+                    addLog(`✅ SELECTED: Good value ratio (${currentRatio.toFixed(2)}) and fits capacity`);
+                    state.selected.push(itemId);
+                    state.used += item.weight;
+                } else {
+                    addLog(`❌ REJECTED: Low value ratio or capacity conflict`);
+                    state.rejected.push(itemId);
+                }
+            }
+            
+            updateUI();
+        }
+        
+        function runAlgorithm() {
+            resetTrace();
+            document.getElementById('status').textContent = 'Running...';
+            state.startTime = Date.now();
+            
+            addLog('Algorithm START: Processing items by value ratio...');
+            addLog(`Total Capacity: ${state.capacity} units`);
+            addLog('');
+            
+            const sorted = [...mockItems].sort((a, b) => (b.value / b.weight) - (a.value / a.weight));
+            let index = 0;
+            
+            const interval = setInterval(() => {
+                if (index >= sorted.length) {
+                    clearInterval(interval);
+                    const elapsed = Date.now() - state.startTime;
+                    document.getElementById('status').textContent = 'Completed';
+                    document.getElementById('procTime').textContent = elapsed + 'ms';
+                    addLog('');
+                    addLog(`Algorithm COMPLETE in ${elapsed}ms`);
+                    addLog(`Total items selected: ${state.selected.length}`);
+                    return;
+                }
+                
+                processItem(sorted[index].id);
+                index++;
+            }, 300);
+        }
+        
+        function stepThrough() {
+            if (state.step === 0) {
+                document.getElementById('status').textContent = 'Stepping...';
+                state.startTime = Date.now();
+                addLog('Algorithm START: Processing items by value ratio...');
+                addLog(`Total Capacity: ${state.capacity} units`);
+                addLog('');
+            }
+            
+            const sorted = [...mockItems].sort((a, b) => (b.value / b.weight) - (a.value / a.weight));
+            const unprocessed = sorted.find(i => !state.selected.includes(i.id) && !state.rejected.includes(i.id));
+            
+            if (unprocessed) {
+                processItem(unprocessed.id);
+            } else {
+                const elapsed = Date.now() - state.startTime;
+                document.getElementById('status').textContent = 'Completed';
+                document.getElementById('procTime').textContent = elapsed + 'ms';
+                addLog('Algorithm COMPLETE');
+                addLog(`Total items selected: ${state.selected.length}`);
+            }
+        }
+        
+        function resetTrace() {
+            state = {
+                capacity: 500,
+                used: 0,
+                selected: [],
+                rejected: [],
+                startTime: null,
+                step: 0
+            };
+            document.getElementById('status').textContent = 'Idle';
+            document.getElementById('procTime').textContent = '0ms';
+            document.getElementById('stepLog').innerHTML = '<div class="step-info">Ready to run. Click Run Algorithm or Step Through.</div>';
+            updateUI();
+        }
+        
+        // Initialize
+        updateUI();
+    </script>
+</body>
+</html>
