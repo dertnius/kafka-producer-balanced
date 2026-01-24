@@ -39,10 +39,10 @@ jobs:
         dotnet test Tests/MyDotNetApp.Tests/MyDotNetApp.Tests.csproj \
           --configuration Release \
           --logger "console;verbosity=detailed" \
-          /p:CollectCoverage=true \
-          /p:CoverletOutputFormat=cobertura \
-          /p:CoverletOutput=./coverage \
-          /p:Exclude="[*Tests]*,[*ServiceDefaults]*" \
+          "/p:CollectCoverage=true" \
+          "/p:CoverletOutputFormat=cobertura" \
+          "/p:CoverletOutput=./coverage" \
+          "/p:Exclude=[*Tests]*,[*ServiceDefaults]*" \
           --results-directory=TestResults
     
     - name: Find coverage file
