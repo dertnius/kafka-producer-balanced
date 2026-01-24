@@ -8,6 +8,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MyDotNetApp.Models;
 using MyDotNetApp.Services;
+using MyDotNetApp.Data;
+using MyDotNetApp.Data.Concrete;
+using MyDotNetApp.Data.UnitOfWork;
 using System.Data;
 using Microsoft.Data.SqlClient;
 
@@ -46,6 +49,12 @@ public class Startup
             connection.Open();
             return connection;
         });
+
+        // Register data access layer (repositories and unit of work)
+        services.AddDataAccess(connectionString);
+
+        // Register OutboxProcessingService
+        services.AddScoped<OutboxProcessingService>();
 
         // Add services
         services.AddScoped<IOutboxService>(sp => 

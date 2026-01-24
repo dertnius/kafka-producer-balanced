@@ -33,7 +33,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
     private readonly IAsyncSerializer<GenericRecord> _avroSerializer;
     private readonly RecordSchema _outboxSchema;
     
-    private readonly Channel<OutboxMessage> _processingChannel;
+    private readonly Channel<OutboxMessageLegacy> _processingChannel;
     private readonly ConcurrentBag<Task> _backgroundTasks;
     private readonly SemaphoreSlim _databaseSemaphore;
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _mortgageStidLocks;
@@ -61,7 +61,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
         _mortgageStidLocks = new ConcurrentDictionary<string, SemaphoreSlim>();
         _stidLastUsed = new ConcurrentDictionary<string, long>();
         _inFlightMessages = new ConcurrentDictionary<long, long>(); // Track with timestamp for cleanup
-        _processingChannel = Channel.CreateBounded<OutboxMessage>(
+        _processingChannel = Channel.CreateBounded<OutboxMessageLegacy>(
             new BoundedChannelOptions(_kafkaSettings.MaxProducerBuffer)
             {
                 FullMode = BoundedChannelFullMode.Wait
@@ -360,7 +360,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
         }
     }
 
-    protected virtual async Task<List<OutboxMessage>> GetUnprocessedMessagesAsync(CancellationToken stoppingToken)
+    protected virtual async Task<List<OutboxMessageLegacy>> GetUnprocessedMessagesAsync(CancellationToken stoppingToken)
     {
         await _databaseSemaphore.WaitAsync(stoppingToken);
         
@@ -412,7 +412,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
                     WHERE rn = 1
                     ORDER BY MortgageStid ASC, Id ASC";
                 
-                var messages = await connection.QueryAsync<OutboxMessage>(
+                var messages = await connection.QueryAsync<OutboxMessageLegacy>(
                     sql,
                     new { BatchSize = _kafkaSettings.BatchSize });
 
@@ -430,7 +430,7 @@ public class OutboxProcessorServiceScaled : BackgroundService
         return dt.HasValue ? new DateTimeOffset(dt.Value).ToUnixTimeMilliseconds() : (long?)null;
     }
 
-    private async Task SendMessageToKafkaAsync(OutboxMessage message, CancellationToken stoppingToken)
+    private async Task SendMessageToKafkaAsync(OutboxMessageLegacy message, CancellationToken stoppingToken)
     {
         try
         {

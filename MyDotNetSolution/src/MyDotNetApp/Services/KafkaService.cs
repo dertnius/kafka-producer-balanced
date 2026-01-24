@@ -17,7 +17,7 @@ namespace MyDotNetApp.Services
         public string? ErrorCode { get; set; }
     }
 
-    public class OutboxMessage
+    public class OutboxMessageLegacy
     {
         public long Id { get; set; }
         public string? AggregateId { get; set; }
