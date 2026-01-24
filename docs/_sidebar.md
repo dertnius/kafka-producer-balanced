@@ -1,4 +1,4 @@
-<!-- Navigation sidebar -->
+<!-- Navigation sidebar - Complete Documentation Index -->
 
 * [🏠 Home](/)
 
@@ -11,14 +11,14 @@
 * **Memory Tracking** 🧠
   * [Visual Guide](MEMORY_VISUAL_GUIDE.md)
   * [Quick Start](MEMORY_QUICK_START.md)
-  * [Examples & Patterns](MEMORY_TRACKING_EXAMPLES.md)
   * [Technical Details](MEMORY_TRACKING.md)
-  * [Implementation](MEMORY_TRACKING_IMPLEMENTATION.md)
-  * [Complete Guide](MEMORY_COMPLETE.md)
+  * [Examples & Patterns](MEMORY_TRACKING_EXAMPLES.md)
+  * [Implementation Guide](MEMORY_TRACKING_IMPLEMENTATION.md)
+  * [Complete Reference](MEMORY_COMPLETE.md)
   * [Leak Resolution](MEMORY_LEAK_RESOLUTION.md)
 
-* **Consumer** 📨
-  * [Architecture](CONSUMER_ARCHITECTURE.md)
+* **Consumer Implementation** 📨
+  * [Architecture Overview](CONSUMER_ARCHITECTURE.md)
   * [Implementation Summary](CONSUMER_IMPLEMENTATION_SUMMARY.md)
   * [Quick Reference](CONSUMER_QUICK_REFERENCE.md)
   * [Performance Guide](CONSUMER_PERFORMANCE_GUIDE.md)
@@ -26,12 +26,12 @@
   * [Complete Guide](CONSUMER_COMPLETE.md)
   * [Ready Status](CONSUMER_READY.md)
 
-* **Publishing** 📤
+* **Publishing Feature** 📤
   * [Feature Guide](PUBLISHING_FEATURE_GUIDE.md)
-  * [Implementation](PUBLISHING_IMPLEMENTATION.md)
-  * [README Publishing](README_PUBLISHING.md)
+  * [Implementation Details](PUBLISHING_IMPLEMENTATION.md)
+  * [Publishing README](README_PUBLISHING.md)
 
-* **Operations & Deployment** 🛠️
+* **Deployment & Production** 🛠️
   * [Production Guide](PRODUCTION_GUIDE.md)
   * [Deployment Checklist](DEPLOYMENT_CHECKLIST.md)
   * [Deployment Guide](DEPLOYMENT_GUIDE.md)
@@ -40,12 +40,12 @@
 
 * **Optimization & Testing** ⚡
   * [Million Records Optimization](MILLION_RECORDS_OPTIMIZATION.md)
-  * [Optimization Complete](OPTIMIZATION_COMPLETE.md)
+  * [Optimization Completion](OPTIMIZATION_COMPLETE.md)
   * [Testing Commands](TESTING_COMMANDS.md)
   * [Test Report](TEST_REPORT.md)
   * [Error Handling Analysis](ERROR_HANDLING_ANALYSIS.md)
 
-* **Documentation & Reference** 📚
+* **Documentation & Summaries** 📚
   * [Documentation Index](DOCUMENTATION_INDEX.md)
   * [Implementation Summary](IMPLEMENTATION_SUMMARY.md)
   * [Completion Summary](COMPLETION_SUMMARY.md)
@@ -56,6 +56,9 @@
   * [Database Schema](DATABASE_SCHEMA.sql)
   * [Mermaid Diagrams](mermaid.md)
 
-* **External Links**
-  * [GitHub Repository](https://github.com/dertnius/kafka-producer-balanced)
-  * [Issues & Support](https://github.com/dertnius/kafka-producer-balanced/issues)
+* **All Documentation** 📖
+  * [Full Index](DOCUMENTATION_INDEX.md)
+
+* **External**
+  * [GitHub](https://github.com/dertnius/kafka-producer-balanced)
+  * [Issues](https://github.com/dertnius/kafka-producer-balanced/issues)
