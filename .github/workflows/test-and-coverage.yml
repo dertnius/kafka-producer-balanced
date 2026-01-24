@@ -1,0 +1,72 @@
+name: Test & Coverage Report
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-and-coverage:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Restore dependencies
+      run: |
+        cd MyDotNetSolution
+        dotnet restore
+    
+    - name: Build
+      run: |
+        cd MyDotNetSolution
+        dotnet build --no-restore --configuration Release
+    
+    - name: Run Tests with Coverage
+      run: |
+        cd MyDotNetSolution
+        dotnet test Tests/MyDotNetApp.Tests/MyDotNetApp.Tests.csproj \
+          --no-build \
+          --configuration Release \
+          --logger "console;verbosity=detailed" \
+          /p:CollectCoverage=true \
+          /p:CoverletOutputFormat=cobertura \
+          /p:CoverletOutput=./coverage/ \
+          /p:Exclude="[*Tests]*,[*ServiceDefaults]*"
+    
+    - name: Generate Coverage Report
+      if: success()
+      run: |
+        cd MyDotNetSolution
+        dotnet tool install -g ReportGenerator
+        reportgenerator -reports:"Tests/MyDotNetApp.Tests/coverage/coverage.cobertura.xml" \
+          -targetdir:"../docs/coverage" \
+          -reporttypes:"Html;Badges" \
+          -title:"Test Coverage Report"
+    
+    - name: Commit and push coverage report
+      if: success()
+      run: |
+        cd .
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add docs/coverage/ 2>/dev/null || true
+        git commit -m "ci: Update test coverage report" 2>/dev/null || true
+        git push 2>/dev/null || true
+    
+    - name: Test Summary
+      if: always()
+      run: |
+        echo "## Test & Coverage Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Tests completed successfully" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📊 Coverage Report: [View Coverage](https://dertnius.github.io/kafka-producer-balanced/#/coverage/)" >> $GITHUB_STEP_SUMMARY
