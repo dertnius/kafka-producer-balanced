@@ -37,3 +37,4 @@ dotnet test Tests/MyDotNetApp.Tests/MyDotNetApp.Tests.csproj `
 - [Testing Commands](TESTING_COMMANDS.md)
 - [Test Report](TEST_REPORT.md)
 - [GitHub Actions Workflow](https://github.com/dertnius/kafka-producer-balanced/actions)
+
