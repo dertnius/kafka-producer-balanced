@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mortgage vs Knapsack Optimizer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=DM+Mono&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b1729;
+      --panel: rgba(255, 255, 255, 0.04);
+      --card: #0f2338;
+      --accent: #20df9f;
+      --accent-2: #ff9f43;
+      --text: #dfe6ed;
+      --muted: #93a5be;
+      --grid: rgba(255, 255, 255, 0.05);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: radial-gradient(circle at 10% 20%, rgba(32,223,159,0.08), transparent 25%),
+                  radial-gradient(circle at 80% 10%, rgba(255,159,67,0.06), transparent 25%),
+                  radial-gradient(circle at 30% 80%, rgba(64,132,255,0.05), transparent 20%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 32px;
+    }
+
+    h1 { margin: 0 0 8px; font-size: 32px; }
+    p { color: var(--muted); margin: 0 0 24px; line-height: 1.5; }
+
+    .shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 18px;
+      padding: 28px;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 18px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    }
+
+    .card h3 { margin: 0 0 12px; font-size: 18px; }
+    label { display: block; color: var(--muted); font-size: 13px; margin: 10px 0 6px; }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-size: 15px;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 16px;
+      padding: 14px 12px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(120deg, var(--accent), #1ac4e0);
+      color: #071019;
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0 14px 30px rgba(32,223,159,0.25);
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+    }
+
+    button:hover { transform: translateY(-1px); box-shadow: 0 18px 38px rgba(32,223,159,0.32); }
+    button:active { transform: translateY(0); }
+
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .metric {
+      background: linear-gradient(135deg, rgba(32,223,159,0.06), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .metric label { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .metric .value { display: block; font-size: 20px; margin-top: 6px; }
+
+    .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-top: 10px; }
+    .plan { border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px; background: rgba(255,255,255,0.02); }
+    .plan h4 { margin: 0 0 6px; }
+
+    .pill { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; background: rgba(32,223,159,0.16); color: var(--accent); }
+    .pill.alt { background: rgba(255,159,67,0.18); color: var(--accent-2); }
+
+    .bar {
+      height: 9px;
+      background: var(--grid);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .bar span { display: block; height: 100%; background: linear-gradient(120deg, var(--accent-2), var(--accent)); }
+
+    .timeline {
+      margin-top: 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255,255,255,0.02);
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .timeline .row {
+      display: grid;
+      grid-template-columns: 90px 1fr 90px;
+      gap: 8px;
+      align-items: center;
+      padding: 8px;
+      border-radius: 10px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .row .tag { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--muted); }
+    .row .label { font-weight: 600; }
+    .row .chip { justify-self: end; padding: 4px 10px; border-radius: 10px; font-size: 12px; color: #071019; background: var(--accent); }
+    .row.greedy { border-color: rgba(32,223,159,0.35); }
+    .row.dp { border-color: rgba(255,159,67,0.35); }
+
+    .steps {
+      margin-top: 28px;
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 18px;
+      padding: 24px;
+      backdrop-filter: blur(6px);
+    }
+
+    .step-group {
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .step-group:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+
+    .step-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 12px;
+      color: var(--accent);
+    }
+
+    .step-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .step-table th {
+      background: rgba(32,223,159,0.08);
+      padding: 10px;
+      text-align: left;
+      border: 1px solid rgba(255,255,255,0.06);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .step-table td {
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,0.04);
+      color: var(--text);
+    }
+
+    .step-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+    .highlight { background: rgba(32,223,159,0.15); color: var(--accent); font-weight: 600; }
+    .highlight.alt { background: rgba(255,159,67,0.15); color: var(--accent-2); }
+
+    .algo-summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .algo-box {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .algo-box h4 {
+      margin: 0 0 8px;
+      font-size: 14px;
+    }
+
+    .algo-box .summary { font-size: 12px; line-height: 1.6; }
+
+    @media (max-width: 980px) { .grid { grid-template-columns: 1fr; } .algo-summary { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <h1>Mortgage + Knapsack Optimizer</h1>
+    <p>Explore how extra payments (items) fit within a limited budget (knapsack) to maximize interest saved. Compare fast greedy picks against optimal dynamic-programming selection.</p>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Inputs</h3>
+        <label>Principal ($)</label>
+        <input id="principal" type="number" value="320000" min="50000" step="1000" />
+
+        <label>Annual Rate (%)</label>
+        <input id="rate" type="number" value="5.2" min="1" max="15" step="0.05" />
+
+        <label>Term (years)</label>
+        <input id="years" type="number" value="30" min="5" max="40" step="1" />
+
+        <label>Extra-payment budget this year ($)</label>
+        <input id="budget" type="number" value="12000" min="500" step="500" />
+
+        <label>Payment resolution</label>
+        <select id="granularity">
+          <option value="50">$50 steps (finer, slower)</option>
+          <option value="100" selected>$100 steps</option>
+          <option value="250">$250 steps</option>
+          <option value="500">$500 steps</option>
+        </select>
+
+        <button id="run">Run optimizer</button>
+        <p style="margin-top:12px;font-size:13px;color:var(--muted)">The model generates 12 candidate extra payments along the year. Greedy chooses by value density; DP scans every combination to maximize total interest saved under the budget.</p>
+      </div>
+
+      <div class="card">
+        <h3>Outcome</h3>
+        <div class="metrics">
+          <div class="metric">
+            <label>Base monthly</label>
+            <span class="value" id="m-mortgage">$0</span>
+          </div>
+          <div class="metric">
+            <label>Base total interest</label>
+            <span class="value" id="m-interest">$0</span>
+          </div>
+          <div class="metric">
+            <label>Greedy saved</label>
+            <span class="value" id="m-greedy">$0</span>
+          </div>
+          <div class="metric">
+            <label>DP saved</label>
+            <span class="value" id="m-dp">$0</span>
+          </div>
+        </div>
+
+        <div class="plans" id="plans"></div>
+        <div class="timeline" id="timeline"></div>
+      </div>
+    </div>
+
+    <div class="steps">
+      <h2 style="margin: 0 0 18px;">Step-by-Step Breakdown</h2>
+      
+      <div class="step-group">
+        <div class="step-title">Step 1: Calculate Base Mortgage</div>
+        <div style="color: var(--muted); font-size: 14px;">
+          With no extra payments, here's your baseline:
+        </div>
+        <table class="step-table" style="margin-top: 10px;">
+          <tr>
+            <th>Metric</th>
+            <th>Value</th>
+          </tr>
+          <tr>
+            <td>Monthly payment</td>
+            <td id="step-monthly">$0</td>
+          </tr>
+          <tr>
+            <td>Total payments (360 months)</td>
+            <td id="step-total-pay">$0</td>
+          </tr>
+          <tr>
+            <td style="font-weight:600;">Total interest over 30 years</td>
+            <td id="step-total-interest" style="font-weight:600;">$0</td>
+          </tr>
+        </table>
+      </div>
+
+      <div class="step-group">
+        <div class="step-title">Step 2: Generate 12 Candidate Extra-Payment Opportunities</div>
+        <div style="color: var(--muted); font-size: 14px;">
+          The algorithm creates realistic payment options spread across the year. Earlier payments save more interest.
+        </div>
+        <table class="step-table" style="margin-top: 10px;">
+          <tr>
+            <th>When</th>
+            <th>Extra Payment</th>
+            <th>Interest Saved</th>
+            <th>ROI</th>
+            <th>Impact</th>
+          </tr>
+          <tbody id="step-candidates"></tbody>
+        </table>
+      </div>
+
+      <div class="step-group">
+        <div class="step-title">Step 3: Greedy Algorithm (Pick by Best ROI First)</div>
+        <div style="color: var(--muted); font-size: 14px; margin-bottom: 10px;">
+          Strategy: Sort by ROI, add items until budget runs out. Fast but may miss better combinations.
+        </div>
+        <div id="step-greedy-process" style="font-size: 13px; color: var(--text); line-height: 1.8;"></div>
+        <div class="algo-box" style="background: rgba(32,223,159,0.08); border-color: rgba(32,223,159,0.3); margin-top: 12px;">
+          <h4>Greedy Result</h4>
+          <div class="summary">
+            <div>Items selected: <span id="step-greedy-count">0</span></div>
+            <div>Total spent: <span id="step-greedy-spent">$0</span></div>
+            <div style="margin-top: 4px; font-weight: 600;">Total interest saved: <span id="step-greedy-saved">$0</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-group">
+        <div class="step-title">Step 4: DP Algorithm (Find True Optimal)</div>
+        <div style="color: var(--muted); font-size: 14px; margin-bottom: 10px;">
+          Strategy: Test all <span id="step-combos">0</span> possible combinations to find the one that saves the most under budget.
+        </div>
+        <div id="step-dp-process" style="font-size: 13px; color: var(--text); line-height: 1.8;"></div>
+        <div class="algo-box" style="background: rgba(255,159,67,0.08); border-color: rgba(255,159,67,0.3); margin-top: 12px;">
+          <h4>DP Result (Optimal)</h4>
+          <div class="summary">
+            <div>Items selected: <span id="step-dp-count">0</span></div>
+            <div>Total spent: <span id="step-dp-spent">$0</span></div>
+            <div style="margin-top: 4px; font-weight: 600;">Total interest saved: <span id="step-dp-saved">$0</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step-group">
+        <div class="step-title">Step 5: Comparison</div>
+        <div style="color: var(--muted); font-size: 14px; margin-bottom: 10px;">
+          Which algorithm performed better?
+        </div>
+        <div id="step-comparison"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fmt = (n) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    const fmt2 = (n) => '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    function monthlyPayment(P, r, n) {
+      const m = r / 12;
+      if (m === 0) return P / n;
+      const pow = Math.pow(1 + m, n);
+      return P * m * pow / (pow - 1);
+    }
+
+    function totalInterest(P, r, n) {
+      const pay = monthlyPayment(P, r, n);
+      return pay * n - P;
+    }
+
+    function generateCandidates(principal, months) {
+      const monthlyRate = (document.getElementById('rate').value / 100) / 12;
+      const step = Math.max(1, Math.floor(months / 12));
+      const minX = principal * 0.0035;
+      const maxX = principal * 0.018;
+      const rng = (seed) => {
+        let x = seed;
+        return () => { x ^= x << 13; x ^= x >> 17; x ^= x << 5; return Math.abs(x); };
+      };
+      const rand = rng(1337);
+      const items = [];
+      for (let i = 0, m = step; i < 12 && m <= months; i++, m += step) {
+        const t = rand() % 1000 / 1000;
+        const cost = Math.round(minX + (maxX - minX) * t);
+        const remaining = months - m;
+        const saved = Math.max(0, cost * monthlyRate * remaining);
+        items.push({
+          id: i,
+          month: m,
+          label: `Month ${m}`,
+          cost,
+          value: saved,
+          roi: saved / cost
+        });
+      }
+      return items;
+    }
+
+    function greedy(items, budget) {
+      const sorted = [...items].sort((a, b) => b.roi - a.roi);
+      const chosen = [];
+      let spent = 0, value = 0;
+      for (const it of sorted) {
+        if (spent + it.cost <= budget) {
+          chosen.push(it);
+          spent += it.cost;
+          value += it.value;
+        }
+      }
+      return { chosen, spent, value };
+    }
+
+    function dpOptimal(items, budget, unit) {
+      // Evaluate all subsets using bitmasks (12 items -> 4096 states).
+      let bestMask = 0;
+      let bestValue = 0;
+      let bestCost = 0;
+      const n = items.length;
+      const limit = 1 << n;
+      for (let mask = 1; mask < limit; mask++) {
+        let cost = 0, val = 0;
+        for (let i = 0; i < n; i++) {
+          if (mask & (1 << i)) {
+            cost += items[i].cost;
+            val += items[i].value;
+            if (cost > budget) break;
+          }
+        }
+        if (cost <= budget && (val > bestValue || (val === bestValue && cost < bestCost))) {
+          bestValue = val;
+          bestCost = cost;
+          bestMask = mask;
+        }
+      }
+      const chosen = [];
+      for (let i = 0; i < n; i++) {
+        if (bestMask & (1 << i)) chosen.push(items[i]);
+      }
+      return { chosen, spent: bestCost, value: bestValue };
+    }
+
+    function renderPlans(greedyPlan, dpPlan, budget) {
+      const plans = document.getElementById('plans');
+      const cards = [
+        { name: 'Greedy ratio pick', plan: greedyPlan, tone: 'primary' },
+        { name: 'DP optimal', plan: dpPlan, tone: 'alt' }
+      ];
+      plans.innerHTML = cards.map(c => {
+        const roi = c.plan.spent === 0 ? 0 : c.plan.value / c.plan.spent;
+        const fill = Math.min(100, (c.plan.spent / budget) * 100);
+        return `
+          <div class="plan">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+              <h4>${c.name}</h4>
+              <span class="pill ${c.tone === 'alt' ? 'alt' : ''}">${c.plan.chosen.length} picks</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px;">
+              <span>Spend ${fmt(Math.round(c.plan.spent))}</span>
+              <span>Save ${fmt(Math.round(c.plan.value))}</span>
+            </div>
+            <div class="bar"><span style="width:${fill}%;"></span></div>
+            <div style="display:flex;justify-content:space-between;font-size:13px;margin-top:6px;color:var(--muted);">
+              <span>Budget use</span>
+              <span>ROI ${(roi * 100).toFixed(1)}%</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderTimeline(items, greedyPlan, dpPlan) {
+      const timeline = document.getElementById('timeline');
+      const greedySet = new Set(greedyPlan.chosen.map(i => i.id));
+      const dpSet = new Set(dpPlan.chosen.map(i => i.id));
+      timeline.innerHTML = items.map(it => {
+        const inG = greedySet.has(it.id);
+        const inD = dpSet.has(it.id);
+        const tone = inD ? 'dp' : inG ? 'greedy' : '';
+        const chip = inD ? 'DP pick' : inG ? 'Greedy pick' : 'Skip';
+        const chipColor = inD ? 'background: var(--accent-2); color:#071019;' : inG ? 'background: var(--accent); color:#071019;' : 'background: var(--grid); color: var(--muted);';
+        return `
+          <div class="row ${tone}">
+            <span class="tag">${it.label}</span>
+            <span class="label">$${it.cost.toLocaleString()} • est. save ${fmt(Math.round(it.value))}</span>
+            <span class="chip" style="${chipColor}">${chip}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderSteps(P, r, years, months, budget, items, greedyPlan, dpPlan) {
+      const mPay = monthlyPayment(P, r, months);
+      const totalPayments = mPay * months;
+      const baseInterest = totalInterest(P, r, months);
+
+      // Step 1
+      document.getElementById('step-monthly').textContent = fmt2(mPay);
+      document.getElementById('step-total-pay').textContent = fmt(Math.round(totalPayments));
+      document.getElementById('step-total-interest').textContent = fmt(Math.round(baseInterest));
+
+      // Step 2: Candidates
+      const candTable = document.getElementById('step-candidates');
+      candTable.innerHTML = items.map(it => `
+        <tr>
+          <td>${it.label}</td>
+          <td>${fmt(it.cost)}</td>
+          <td>${fmt(Math.round(it.value))}</td>
+          <td>${(it.roi * 100).toFixed(1)}%</td>
+          <td style="font-size:12px;color:var(--muted);">Pays off ${Math.round(months - it.month)} months early</td>
+        </tr>
+      `).join('');
+
+      // Step 3: Greedy process
+      const sortedByROI = [...items].sort((a, b) => b.roi - a.roi);
+      let greedyTrace = '<div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">';
+      let runningSpent = 0, runningValue = 0;
+      sortedByROI.forEach((it, idx) => {
+        const wouldExceed = runningSpent + it.cost > budget;
+        if (wouldExceed) {
+          greedyTrace += `<div style="color:var(--muted);">❌ ${it.label} ($${it.cost}) — would exceed budget (${runningSpent} + ${it.cost} > ${budget})</div>`;
+        } else {
+          runningSpent += it.cost;
+          runningValue += it.value;
+          greedyTrace += `<div style="color:var(--accent);">✓ Pick ${it.label} ($${it.cost}, save ${fmt(Math.round(it.value))}) — running total: $${runningSpent} / $${budget}</div>`;
+        }
+      });
+      greedyTrace += '</div>';
+      document.getElementById('step-greedy-process').innerHTML = greedyTrace;
+      document.getElementById('step-greedy-count').textContent = greedyPlan.chosen.length;
+      document.getElementById('step-greedy-spent').textContent = fmt(Math.round(greedyPlan.spent));
+      document.getElementById('step-greedy-saved').textContent = fmt(Math.round(greedyPlan.value));
+
+      // Step 4: DP process
+      const totalCombos = Math.pow(2, items.length);
+      document.getElementById('step-combos').textContent = totalCombos.toLocaleString();
+      let dpTrace = '<div style="background: rgba(255,255,255,0.02); padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);">';
+      dpTrace += `<div style="margin-bottom:8px;">Testing ${totalCombos} possible subsets...</div>`;
+      dpTrace += `<div style="color:var(--accent-2);">✓ Found best: <strong>${dpPlan.chosen.length}</strong> items, spend <strong>$${Math.round(dpPlan.spent)}</strong>, save <strong>${fmt(Math.round(dpPlan.value))}</strong></div>`;
+      dpTrace += `<div style="color:var(--muted);margin-top:8px;font-size:12px;">Selected: ${dpPlan.chosen.map(it => it.label).join(', ')}</div>`;
+      dpTrace += '</div>';
+      document.getElementById('step-dp-process').innerHTML = dpTrace;
+      document.getElementById('step-dp-count').textContent = dpPlan.chosen.length;
+      document.getElementById('step-dp-spent').textContent = fmt(Math.round(dpPlan.spent));
+      document.getElementById('step-dp-saved').textContent = fmt(Math.round(dpPlan.value));
+
+      // Step 5: Comparison
+      const improvement = dpPlan.value - greedyPlan.value;
+      const improvementPct = greedyPlan.value === 0 ? 0 : (improvement / greedyPlan.value) * 100;
+      const greedyROI = (greedyPlan.value / greedyPlan.spent) * 100;
+      const dpROI = (dpPlan.value / dpPlan.spent) * 100;
+
+      let compHtml = '<div class="algo-summary">';
+      compHtml += `
+        <div class="algo-box" style="background: rgba(32,223,159,0.08); border-color: rgba(32,223,159,0.3);">
+          <h4>⚡ Greedy</h4>
+          <div class="summary">
+            <div>Items: ${greedyPlan.chosen.length}</div>
+            <div>Spent: ${fmt(Math.round(greedyPlan.spent))}</div>
+            <div>Saved: ${fmt(Math.round(greedyPlan.value))}</div>
+            <div style="margin-top:4px;font-size:12px;color:var(--muted);">ROI: ${greedyROI.toFixed(1)}%</div>
+          </div>
+        </div>
+      `;
+      compHtml += `
+        <div class="algo-box" style="background: rgba(255,159,67,0.08); border-color: rgba(255,159,67,0.3);">
+          <h4>🎯 DP (Optimal)</h4>
+          <div class="summary">
+            <div>Items: ${dpPlan.chosen.length}</div>
+            <div>Spent: ${fmt(Math.round(dpPlan.spent))}</div>
+            <div>Saved: ${fmt(Math.round(dpPlan.value))}</div>
+            <div style="margin-top:4px;font-size:12px;color:var(--muted);">ROI: ${dpROI.toFixed(1)}%</div>
+          </div>
+        </div>
+      `;
+      compHtml += '</div>';
+      
+      if (improvement > 0) {
+        compHtml += `<div style="margin-top:12px;padding:12px;background:rgba(32,223,159,0.1);border-radius:10px;border-left:3px solid var(--accent);">
+          <strong>DP found better combination!</strong> Extra savings: <span class="highlight">${fmt(Math.round(improvement))}</span> (${improvementPct.toFixed(1)}% better)
+        </div>`;
+      } else if (improvement === 0) {
+        compHtml += `<div style="margin-top:12px;padding:12px;background:rgba(100,200,255,0.1);border-radius:10px;border-left:3px solid #64c8ff;">
+          Both algorithms found equally good selections.
+        </div>`;
+      }
+
+      document.getElementById('step-comparison').innerHTML = compHtml;
+    }
+
+    function run() {
+      const P = parseFloat(document.getElementById('principal').value || '0');
+      const r = (parseFloat(document.getElementById('rate').value || '0')) / 100;
+      const years = parseInt(document.getElementById('years').value || '0', 10);
+      const months = years * 12;
+      const budget = Math.max(0, parseFloat(document.getElementById('budget').value || '0'));
+      const unit = parseInt(document.getElementById('granularity').value, 10);
+
+      const mPay = monthlyPayment(P, r, months);
+      const baseInterest = totalInterest(P, r, months);
+
+      const items = generateCandidates(P, months);
+      const greedyPlan = greedy(items, budget);
+      const dpPlan = dpOptimal(items, budget, unit);
+
+      document.getElementById('m-mortgage').textContent = fmt2(mPay);
+      document.getElementById('m-interest').textContent = fmt(Math.round(baseInterest));
+      document.getElementById('m-greedy').textContent = fmt(Math.round(greedyPlan.value));
+      document.getElementById('m-dp').textContent = fmt(Math.round(dpPlan.value));
+
+      renderPlans(greedyPlan, dpPlan, budget);
+      renderTimeline(items, greedyPlan, dpPlan);
+      renderSteps(P, r, years, months, budget, items, greedyPlan, dpPlan);
+    }
+
+    document.getElementById('run').addEventListener('click', run);
+    run();
+  </script>
+</body>
+</html>

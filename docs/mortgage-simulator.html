@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mortgage Portfolio Simulation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=DM+Mono&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b1729;
+      --panel: rgba(255, 255, 255, 0.04);
+      --card: #0f2338;
+      --accent: #20df9f;
+      --accent-2: #ff9f43;
+      --accent-3: #4284ff;
+      --text: #dfe6ed;
+      --muted: #93a5be;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: radial-gradient(circle at 10% 20%, rgba(32,223,159,0.08), transparent 25%),
+                  radial-gradient(circle at 80% 10%, rgba(255,159,67,0.06), transparent 25%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    p { color: var(--muted); margin: 0 0 16px; }
+
+    .shell {
+      max-width: 1600px;
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 18px;
+      padding: 24px;
+      backdrop-filter: blur(6px);
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .control-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    label { font-size: 13px; color: var(--muted); }
+    input[type="number"], select {
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      font-size: 13px;
+    }
+
+    button {
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: none;
+      background: linear-gradient(120deg, var(--accent), #1ac4e0);
+      color: #071019;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      transition: transform 0.08s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .sim-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .sim-panel {
+      background: var(--card);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 14px;
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    .sim-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .canvas-container {
+      width: 100%;
+      height: 400px;
+      position: relative;
+      background: rgba(0,0,0,0.3);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    canvas { display: block; }
+
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    .stat-item {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 8px;
+      padding: 8px;
+    }
+
+    .stat-label { color: var(--muted); }
+    .stat-value { font-weight: 600; font-size: 14px; margin-top: 4px; }
+
+    .pool-canvas {
+      width: 100%;
+      height: 200px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 12px;
+      margin-bottom: 16px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      padding: 12px;
+      background: rgba(255,255,255,0.02);
+      border-radius: 8px;
+      flex-wrap: wrap;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+    }
+
+    .dot-pending { background: rgba(255,255,255,0.3); }
+    .dot-selected { background: var(--accent); }
+    .dot-rejected { background: #ff6b6b; }
+    .dot-processing { background: var(--accent-3); animation: pulse 1s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    @media (max-width: 1200px) { .sim-container { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <h1>Portfolio Optimization Simulator</h1>
+    <p>Watch both algorithms process mortgages in real-time. See how Greedy picks high-ROI items first, while DP finds the truly optimal combination.</p>
+
+    <div class="controls">
+      <div class="control-group">
+        <label>Mortgages:</label>
+        <input id="poolSize" type="number" value="20" min="5" max="50" />
+      </div>
+      <div class="control-group">
+        <label>Budget ($M):</label>
+        <input id="budget" type="number" value="5" min="1" max="20" step="0.5" />
+      </div>
+      <div class="control-group">
+        <label>Speed:</label>
+        <select id="speed">
+          <option value="1000">Slow (1s)</option>
+          <option value="500" selected>Normal (500ms)</option>
+          <option value="250">Fast (250ms)</option>
+          <option value="100">Very Fast (100ms)</option>
+        </select>
+      </div>
+      <button id="startBtn" onclick="window.startSimulation()">Start Simulation</button>
+      <button id="resetBtn" onclick="window.resetSimulation()" disabled>Reset</button>
+    </div>
+
+    <div class="sim-container">
+      <div class="sim-panel">
+        <div class="sim-title">⚡ Greedy Algorithm</div>
+        <div class="canvas-container">
+          <canvas id="greedyCanvas" width="500" height="400"></canvas>
+        </div>
+        <div class="stats">
+          <div class="stat-item">
+            <span class="stat-label">Selected</span>
+            <span class="stat-value" id="greedy-count">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Spent</span>
+            <span class="stat-value" id="greedy-spent">$0M</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Profit</span>
+            <span class="stat-value" id="greedy-profit">$0M</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Status</span>
+            <span class="stat-value" id="greedy-status">Ready</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sim-panel">
+        <div class="sim-title">🎯 DP Algorithm (Optimal)</div>
+        <div class="canvas-container">
+          <canvas id="dpCanvas" width="500" height="400"></canvas>
+        </div>
+        <div class="stats">
+          <div class="stat-item">
+            <span class="stat-label">Selected</span>
+            <span class="stat-value" id="dp-count">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Spent</span>
+            <span class="stat-value" id="dp-spent">$0M</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Profit</span>
+            <span class="stat-value" id="dp-profit">$0M</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Status</span>
+            <span class="stat-value" id="dp-status">Ready</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sim-panel">
+      <div class="sim-title">📋 Rejection Report</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 12px;">
+          <div style="font-weight: 600; margin-bottom: 8px; color: var(--accent);">Greedy Rejections</div>
+          <div id="greedy-rejections" style="font-size: 12px; max-height: 200px; overflow-y: auto; color: var(--muted); line-height: 1.6;"></div>
+        </div>
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 12px;">
+          <div style="font-weight: 600; margin-bottom: 8px; color: var(--accent-2);">DP Rejections</div>
+          <div id="dp-rejections" style="font-size: 12px; max-height: 200px; overflow-y: auto; color: var(--muted); line-height: 1.6;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sim-panel">
+      <div class="sim-title">Available Mortgage Pool</div>
+      <div class="pool-canvas" id="poolContainer">
+        <canvas id="poolCanvas" width="1500" height="200"></canvas>
+      </div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="legend-dot dot-pending"></div>
+          <span>Pending</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot dot-processing"></div>
+          <span>Processing</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot dot-selected"></div>
+          <span>Selected</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot dot-rejected"></div>
+          <span>Rejected</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let mortgages = [];
+    let simState = {
+      greedy: { selected: [], spent: 0, profit: 0, status: 'Ready', processing: -1, rejected: [] },
+      dp: { selected: [], spent: 0, profit: 0, status: 'Ready', processing: -1, rejected: [] },
+      mortgage_states: {} // tracks state of each mortgage for both algos
+    };
+
+    const fmt = (n) => '$' + n.toFixed(2) + 'M';
+
+    function generateMortgages() {
+      const size = parseInt(document.getElementById('poolSize').value, 10);
+      if (size < 1) return;
+
+      const rng = (seed) => {
+        let x = seed;
+        return () => { x ^= x << 13; x ^= x >> 17; x ^= x << 5; return Math.abs(x); };
+      };
+      const rand = rng(12345);
+
+      mortgages = [];
+      for (let i = 0; i < size; i++) {
+        const principal = 0.15 + (rand() % 600) / 1000;
+        const profit = 0.002 + (rand() % 30) / 10000;
+        mortgages.push({
+          id: i,
+          principal,
+          profit,
+          roi: profit / principal
+        });
+      }
+
+      // Initialize mortgage states
+      const states = {};
+      mortgages.forEach(m => {
+        states[m.id] = { greedy: 'pending', dp: 'pending' };
+      });
+      simState.mortgage_states = states;
+    }
+
+    function drawMortgagePool() {
+      const canvas = document.getElementById('poolCanvas');
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.fillRect(0, 0, w, h);
+
+      if (mortgages.length === 0) return;
+
+      const itemWidth = (w - 40) / mortgages.length;
+      const itemHeight = h - 40;
+      const gap = 2;
+
+      mortgages.forEach((m, i) => {
+        const x = 20 + i * (itemWidth + gap);
+        const y = 20;
+
+        const states = simState.mortgage_states[m.id] || {};
+        let color = 'rgba(255,255,255,0.2)'; // pending
+        
+        if (states.greedy === 'selected' || states.dp === 'selected') {
+          color = '#20df9f'; // selected
+        } else if (states.greedy === 'rejected' && states.dp === 'rejected') {
+          color = '#ff6b6b'; // rejected
+        } else if (states.greedy === 'processing' || states.dp === 'processing') {
+          color = '#4284ff'; // processing
+        }
+
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, Math.max(1, itemWidth - gap), itemHeight);
+
+        ctx.fillStyle = '#888';
+        ctx.font = '10px DM Mono';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`#${i + 1}`, x + (itemWidth - gap) / 2, y + itemHeight / 2);
+      });
+    }
+
+    function drawAlgoSimulation(canvasId, algoData) {
+      const canvas = document.getElementById(canvasId);
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.fillRect(0, 0, w, h);
+
+      const budget = parseFloat(document.getElementById('budget').value);
+
+      // Draw budget bar
+      const barHeight = 40;
+      const barY = 20;
+      const barWidth = w - 40;
+
+      ctx.fillStyle = 'rgba(255,255,255,0.1)';
+      ctx.fillRect(20, barY, barWidth, barHeight);
+
+      const budgetUsage = (algoData.spent / budget) * barWidth;
+      ctx.fillStyle = algoData.spent > budget ? '#ff6b6b' : '#20df9f';
+      ctx.fillRect(20, barY, Math.max(0, budgetUsage), barHeight);
+
+      ctx.fillStyle = '#dfe6ed';
+      ctx.font = 'bold 14px Space Grotesk';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`Budget: $${algoData.spent.toFixed(2)}M / $${budget.toFixed(2)}M`, 30, barY + 20);
+
+      // Draw selected mortgages
+      const startY = 80;
+      const itemHeight = 60;
+      const itemsPerRow = 4;
+      const itemWidth = (barWidth / itemsPerRow) - 8;
+
+      algoData.selected.forEach((m, idx) => {
+        const row = Math.floor(idx / itemsPerRow);
+        const col = idx % itemsPerRow;
+        const x = 20 + col * (itemWidth + 8);
+        const y = startY + row * (itemHeight + 8);
+
+        ctx.fillStyle = '#20df9f';
+        ctx.fillRect(x, y, itemWidth, itemHeight);
+
+        ctx.fillStyle = '#000';
+        ctx.font = 'bold 12px Space Grotesk';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(`#${m.id + 1}`, x + itemWidth / 2, y + 8);
+
+        ctx.font = '10px DM Mono';
+        ctx.fillText(`$${m.principal.toFixed(2)}M`, x + itemWidth / 2, y + 25);
+        ctx.fillText(`ROI: ${(m.roi * 100).toFixed(1)}%`, x + itemWidth / 2, y + 40);
+      });
+
+      // Draw processing indicator
+      if (algoData.processing >= 0 && algoData.processing < mortgages.length) {
+        const m = mortgages[algoData.processing];
+        const px = 20;
+        const py = 280;
+        const pw = barWidth;
+        const ph = 50;
+
+        ctx.fillStyle = '#4284ff';
+        ctx.globalAlpha = 0.8;
+        ctx.fillRect(px, py, pw, ph);
+        ctx.globalAlpha = 1;
+
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px Space Grotesk';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`Processing: Mortgage #${m.id + 1} | $${m.principal.toFixed(2)}M | ROI ${(m.roi * 100).toFixed(1)}%`, px + 10, py + ph / 2);
+      }
+    }
+
+    function updateStats() {
+      document.getElementById('greedy-count').textContent = simState.greedy.selected.length;
+      document.getElementById('greedy-spent').textContent = fmt(simState.greedy.spent);
+      document.getElementById('greedy-profit').textContent = fmt(simState.greedy.profit);
+      document.getElementById('greedy-status').textContent = simState.greedy.status;
+
+      document.getElementById('dp-count').textContent = simState.dp.selected.length;
+      document.getElementById('dp-spent').textContent = fmt(simState.dp.spent);
+      document.getElementById('dp-profit').textContent = fmt(simState.dp.profit);
+      document.getElementById('dp-status').textContent = simState.dp.status;
+
+      // Update rejection reports
+      const greedyRejectHtml = simState.greedy.rejected.length === 0 
+        ? '<div style="color: var(--accent); font-size: 11px;">None rejected</div>'
+        : simState.greedy.rejected.map(r => `
+          <div style="margin-bottom: 8px; padding: 8px; background: rgba(255,107,107,0.1); border-radius: 6px; border-left: 2px solid #ff6b6b;">
+            <div style="font-weight: 600;">Mortgage #${r.id + 1}</div>
+            <div style="font-size: 11px; margin-top: 2px;">💰 $${r.principal.toFixed(2)}M | ROI ${(r.roi * 100).toFixed(1)}%</div>
+            <div style="font-size: 11px; margin-top: 2px; color: #ff9999;">${r.reason}</div>
+          </div>
+        `).join('');
+
+      const dpRejectHtml = simState.dp.rejected.length === 0
+        ? '<div style="color: var(--accent-2); font-size: 11px;">None rejected</div>'
+        : simState.dp.rejected.map(r => `
+          <div style="margin-bottom: 8px; padding: 8px; background: rgba(255,159,67,0.1); border-radius: 6px; border-left: 2px solid var(--accent-2);">
+            <div style="font-weight: 600;">Mortgage #${r.id + 1}</div>
+            <div style="font-size: 11px; margin-top: 2px;">💰 $${r.principal.toFixed(2)}M | ROI ${(r.roi * 100).toFixed(1)}%</div>
+            <div style="font-size: 11px; margin-top: 2px; color: #ffa566;">${r.reason}</div>
+          </div>
+        `).join('');
+
+      document.getElementById('greedy-rejections').innerHTML = greedyRejectHtml;
+      document.getElementById('dp-rejections').innerHTML = dpRejectHtml;
+
+      drawMortgagePool();
+      drawAlgoSimulation('greedyCanvas', simState.greedy);
+      drawAlgoSimulation('dpCanvas', simState.dp);
+    }
+
+    async function runGreedy() {
+      simState.greedy.status = 'Running...';
+      simState.greedy.rejected = [];
+      const sorted = [...mortgages].sort((a, b) => b.roi - a.roi);
+      const budget = parseFloat(document.getElementById('budget').value);
+      const speed = parseInt(document.getElementById('speed').value, 10);
+
+      for (let i = 0; i < sorted.length; i++) {
+        const m = sorted[i];
+        simState.greedy.processing = m.id;
+        if (!simState.mortgage_states[m.id]) {
+          simState.mortgage_states[m.id] = { greedy: 'pending', dp: 'pending' };
+        }
+        simState.mortgage_states[m.id].greedy = 'processing';
+        updateStats();
+
+        await new Promise(resolve => setTimeout(resolve, speed));
+
+        if (simState.greedy.spent + m.principal <= budget) {
+          simState.greedy.selected.push(m);
+          simState.greedy.spent += m.principal;
+          simState.greedy.profit += m.profit;
+          simState.mortgage_states[m.id].greedy = 'selected';
+        } else {
+          const wouldExceed = simState.greedy.spent + m.principal;
+          const excess = wouldExceed - budget;
+          simState.greedy.rejected.push({
+            id: m.id,
+            principal: m.principal,
+            roi: m.roi,
+            reason: `Would exceed budget by $${excess.toFixed(2)}M (total would be $${wouldExceed.toFixed(2)}M)`
+          });
+          simState.mortgage_states[m.id].greedy = 'rejected';
+        }
+        updateStats();
+      }
+
+      simState.greedy.processing = -1;
+      simState.greedy.status = 'Complete';
+      updateStats();
+    }
+
+    async function runDP() {
+      simState.dp.status = 'Building DP table...';
+      simState.dp.rejected = [];
+      const budget = parseFloat(document.getElementById('budget').value);
+      const budgetCents = Math.round(budget * 100);
+      const n = mortgages.length;
+      const speed = parseInt(document.getElementById('speed').value, 10);
+
+      const dp = new Array(budgetCents + 1).fill(0);
+      const track = new Array(budgetCents + 1).fill(null).map(() => []);
+
+      for (let i = 0; i < n; i++) {
+        simState.dp.processing = i;
+        if (!simState.mortgage_states[i]) {
+          simState.mortgage_states[i] = { greedy: 'pending', dp: 'pending' };
+        }
+        simState.mortgage_states[i].dp = 'processing';
+        updateStats();
+        await new Promise(resolve => setTimeout(resolve, speed / 10));
+
+        const cost = Math.round(mortgages[i].principal * 100);
+        const value = mortgages[i].profit;
+
+        for (let w = budgetCents; w >= cost; w--) {
+          const withItem = dp[w - cost] + value;
+          if (withItem > dp[w]) {
+            dp[w] = withItem;
+            track[w] = [...track[w - cost], i];
+          }
+        }
+      }
+
+      simState.dp.status = 'Finding optimal...';
+      let bestW = budgetCents;
+      for (let w = budgetCents - 1; w >= 0; w--) {
+        if (dp[w] > dp[bestW]) bestW = w;
+      }
+
+      const selected = track[bestW] || [];
+      const selectedSet = new Set(selected);
+
+      for (const idx of selected) {
+        simState.dp.selected.push(mortgages[idx]);
+        simState.dp.spent += mortgages[idx].principal;
+        simState.dp.profit += mortgages[idx].profit;
+        simState.mortgage_states[idx].dp = 'selected';
+        updateStats();
+        await new Promise(resolve => setTimeout(resolve, speed / 3));
+      }
+
+      // Track rejected mortgages with reasons
+      for (let i = 0; i < n; i++) {
+        if (!selectedSet.has(i)) {
+          simState.mortgage_states[i].dp = 'rejected';
+          const wouldExceed = simState.dp.spent + mortgages[i].principal;
+          if (wouldExceed > budget) {
+            const excess = wouldExceed - budget;
+            simState.dp.rejected.push({
+              id: i,
+              principal: mortgages[i].principal,
+              roi: mortgages[i].roi,
+              reason: `Better value without it (would exceed by $${excess.toFixed(2)}M)`
+            });
+          } else {
+            simState.dp.rejected.push({
+              id: i,
+              principal: mortgages[i].principal,
+              roi: mortgages[i].roi,
+              reason: `Not part of optimal combination`
+            });
+          }
+        }
+      }
+
+      simState.dp.processing = -1;
+      simState.dp.status = 'Complete';
+      updateStats();
+    }
+
+    function resetSimulation() {
+      simState = {
+        greedy: { selected: [], spent: 0, profit: 0, status: 'Ready', processing: -1, rejected: [] },
+        dp: { selected: [], spent: 0, profit: 0, status: 'Ready', processing: -1, rejected: [] },
+        mortgage_states: {}
+      };
+      mortgages.forEach(m => {
+        simState.mortgage_states[m.id] = { greedy: 'pending', dp: 'pending' };
+      });
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('resetBtn').disabled = true;
+      updateStats();
+    }
+
+    async function startSimulation() {
+      generateMortgages();
+      resetSimulation();
+      document.getElementById('startBtn').disabled = true;
+      document.getElementById('resetBtn').disabled = false;
+
+      await Promise.all([runGreedy(), runDP()]);
+    }
+
+    // Expose to global scope for onclick handlers
+    window.startSimulation = startSimulation;
+    window.resetSimulation = resetSimulation;
+
+    generateMortgages();
+    updateStats();
+  </script>
+</body>
+</html>

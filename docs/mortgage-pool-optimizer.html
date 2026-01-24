@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mortgage Pool Optimizer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=DM+Mono&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0b1729;
+      --panel: rgba(255, 255, 255, 0.04);
+      --card: #0f2338;
+      --accent: #20df9f;
+      --accent-2: #ff9f43;
+      --accent-3: #4284ff;
+      --text: #dfe6ed;
+      --muted: #93a5be;
+      --grid: rgba(255, 255, 255, 0.05);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      background: radial-gradient(circle at 10% 20%, rgba(32,223,159,0.08), transparent 25%),
+                  radial-gradient(circle at 80% 10%, rgba(255,159,67,0.06), transparent 25%),
+                  radial-gradient(circle at 30% 80%, rgba(64,132,255,0.05), transparent 20%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 32px;
+    }
+
+    h1 { margin: 0 0 8px; font-size: 32px; }
+    h2 { margin: 20px 0 12px; font-size: 22px; }
+    p { color: var(--muted); margin: 0 0 24px; line-height: 1.5; }
+
+    .shell {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 18px;
+      padding: 28px;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 18px;
+    }
+
+    .pool-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .pool-stat {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 12px;
+    }
+
+    .pool-stat .label { color: var(--muted); }
+    .pool-stat .val { display: block; font-weight: 600; font-size: 14px; margin-top: 4px; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    }
+
+    .card h3 { margin: 0 0 12px; font-size: 18px; }
+    label { display: block; color: var(--muted); font-size: 13px; margin: 10px 0 6px; }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text);
+      font-size: 15px;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+    }
+
+    button {
+      width: 100%;
+      margin-top: 16px;
+      padding: 14px 12px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(120deg, var(--accent), #1ac4e0);
+      color: #071019;
+      font-weight: 700;
+      font-size: 16px;
+      cursor: pointer;
+      box-shadow: 0 14px 30px rgba(32,223,159,0.25);
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+    }
+
+    button:hover { transform: translateY(-1px); box-shadow: 0 18px 38px rgba(32,223,159,0.32); }
+    button:active { transform: translateY(0); }
+
+    .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .metric {
+      background: linear-gradient(135deg, rgba(32,223,159,0.06), rgba(255,255,255,0.02));
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .metric label { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .metric .value { display: block; font-size: 20px; margin-top: 6px; }
+
+    .portfolio-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin: 12px 0;
+    }
+
+    .portfolio-table th {
+      background: rgba(32,223,159,0.08);
+      padding: 10px;
+      text-align: left;
+      border: 1px solid rgba(255,255,255,0.06);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .portfolio-table td {
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,0.04);
+      color: var(--text);
+    }
+
+    .portfolio-table tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+    .portfolio-table tr.selected td { background: rgba(32,223,159,0.15); border-color: rgba(32,223,159,0.3); }
+    .portfolio-table tr.selected.dp td { background: rgba(255,159,67,0.15); border-color: rgba(255,159,67,0.3); }
+
+    .comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    .algo-result {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .algo-result h4 { margin: 0 0 12px; font-size: 14px; }
+    .algo-result .stat { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .algo-result .stat:last-child { border-bottom: none; }
+
+    .pill { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; background: rgba(32,223,159,0.16); color: var(--accent); margin-right: 6px; }
+    .pill.dp { background: rgba(255,159,67,0.18); color: var(--accent-2); }
+    .pill.alt { background: rgba(64,132,255,0.18); color: var(--accent-3); }
+
+    .step-group {
+      margin-top: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .step-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 12px;
+      color: var(--accent);
+    }
+
+    .step-trace {
+      margin-top: 12px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-size: 12px;
+      font-family: 'DM Mono', monospace;
+      line-height: 1.8;
+    }
+
+    .step-trace .pick { color: var(--accent); }
+    .step-trace .skip { color: var(--muted); }
+    .step-trace .error { color: #ff6b6b; }
+    .code-block {
+      background: #0a0e1a;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 12px 0;
+      overflow-x: auto;
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      line-height: 1.8;
+      color: #d4af37;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .code-block .keyword { color: #ff79c6; font-weight: 600; }
+    .code-block .type { color: #8be9fd; }
+    .code-block .string { color: #f1fa8c; }
+    .code-block .comment { color: #6272a4; font-style: italic; }
+    .code-block .method { color: #50fa7b; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <h1>Mortgage Pool Optimizer</h1>
+    <p>Select which mortgages to include in your portfolio. Compare greedy picks vs. optimal dynamic-programming selection.</p>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Portfolio Setup</h3>
+        
+        <label>Pool size (mortgages)</label>
+        <input id="poolSize" type="number" value="15" min="3" max="1000" step="1" />
+        
+        <label>Total investment budget ($M)</label>
+        <input id="budget" type="number" value="5" min="0.5" max="50" step="0.5" />
+
+        <label>Optimization metric</label>
+        <select id="metric">
+          <option value="interest-saved">Total interest saved</option>
+          <option value="roi">Highest ROI</option>
+          <option value="profit-margin">Profit margin</option>
+        </select>
+
+        <button id="generate">Generate mortgages</button>
+        <button id="run" style="background: linear-gradient(120deg, #ff9f43, #ffa502);">Optimize portfolio</button>
+        
+        <p style="margin-top:16px;font-size:12px;color:var(--muted);line-height:1.6;">Each mortgage has principal, rate, term, and expected profit. Your budget is the total capital you can deploy. The optimizer finds which mortgages fit to maximize value.</p>
+      </div>
+
+      <div class="card">
+        <h3>Mortgage Pool Summary</h3>
+        <div id="pool-summary"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 18px;">
+      <h3>Portfolio Analysis</h3>
+      <div class="metrics">
+        <div class="metric">
+          <label>Available mortgages</label>
+          <span class="value" id="m-available">0</span>
+        </div>
+        <div class="metric">
+          <label>Budget</label>
+          <span class="value" id="m-budget">$0M</span>
+        </div>
+        <div class="metric">
+          <label>Greedy selected</label>
+          <span class="value" id="m-greedy-count">0</span>
+        </div>
+        <div class="metric">
+          <label>DP optimal</label>
+          <span class="value" id="m-dp-count">0</span>
+        </div>
+      </div>
+
+      <h2>Greedy Algorithm (Highest ROI First)</h2>
+      <p style="color: var(--muted); font-size: 13px;">Picks mortgages by best return-on-investment ratio until budget is exhausted.</p>
+      <div id="greedy-trace" class="step-trace"></div>
+      <div id="greedy-table"></div>
+      <div class="algo-result" style="background: rgba(32,223,159,0.08); border-color: rgba(32,223,159,0.3);">
+        <h4>Greedy Results</h4>
+        <div class="stat">
+          <span>Mortgages selected</span>
+          <span id="greedy-count" style="font-weight:600;">0</span>
+        </div>
+        <div class="stat">
+          <span>Capital deployed</span>
+          <span id="greedy-deployed" style="font-weight:600;">$0M</span>
+        </div>
+        <div class="stat">
+          <span>Total value captured</span>
+          <span id="greedy-value" style="font-weight:600;">$0M</span>
+        </div>
+        <div class="stat">
+          <span>Avg ROI</span>
+          <span id="greedy-roi" style="font-weight:600;">0%</span>
+        </div>
+      </div>
+
+      <h2 style="margin-top: 28px;">DP Algorithm (Optimal Subset)</h2>
+      <p style="color: var(--muted); font-size: 13px;">Tests all combinations to find the portfolio that maximizes value within budget.</p>
+      <div id="dp-trace" class="step-trace"></div>
+      <div id="dp-table"></div>
+      <div class="algo-result" style="background: rgba(255,159,67,0.08); border-color: rgba(255,159,67,0.3);">
+        <h4>DP Results (Optimal)</h4>
+        <div class="stat">
+          <span>Mortgages selected</span>
+          <span id="dp-count" style="font-weight:600;">0</span>
+        </div>
+        <div class="stat">
+          <span>Capital deployed</span>
+          <span id="dp-deployed" style="font-weight:600;">$0M</span>
+        </div>
+        <div class="stat">
+          <span>Total value captured</span>
+          <span id="dp-value" style="font-weight:600;">$0M</span>
+        </div>
+        <div class="stat">
+          <span>Avg ROI</span>
+          <span id="dp-roi" style="font-weight:600;">0%</span>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; padding: 16px; background: rgba(100,200,255,0.08); border-radius: 12px; border-left: 3px solid var(--accent-3);">
+        <strong>Advantage:</strong> <span id="advantage"></span>
+      </div>
+
+      <h2 style="margin-top: 32px;">C# Implementation</h2>
+      <p style="color: var(--muted); font-size: 13px;">Here's how to implement both algorithms in C#:</p>
+
+      <h3 style="color: var(--accent); margin-top: 20px;">Mortgage & Portfolio Models</h3>
+      <div class="code-block">public class Mortgage
+{
+    public int Id { get; set; }
+    public decimal Principal { get; set; }  // in millions
+    public decimal Rate { get; set; }      // annual %
+    public int Years { get; set; }
+    public decimal Profit { get; set; }     // expected profit
+    public decimal ROI { get; set; }       // profit / principal
+}
+
+public class PortfolioResult
+{
+    public List&lt;Mortgage&gt; Selected { get; set; }
+    public decimal TotalSpent { get; set; }
+    public decimal TotalProfit { get; set; }
+}</div>
+
+      <h3 style="color: var(--accent); margin-top: 20px;">Greedy Algorithm (Highest ROI First)</h3>
+      <div class="code-block">public static PortfolioResult GreedyOptimize(
+    List&lt;Mortgage&gt; mortgages, 
+    decimal budget)
+{
+    // Sort by ROI descending
+    var sorted = mortgages
+        .OrderByDescending(m => m.ROI)
+        .ToList();
+
+    var selected = new List&lt;Mortgage&gt;();
+    decimal spent = 0;
+    decimal profit = 0;
+
+    // Greedily pick highest ROI items
+    foreach (var mortgage in sorted)
+    {
+        if (spent + mortgage.Principal &lt;= budget)
+        {
+            selected.Add(mortgage);
+            spent += mortgage.Principal;
+            profit += mortgage.Profit;
+        }
+    }
+
+    return new PortfolioResult
+    {
+        Selected = selected,
+        TotalSpent = spent,
+        TotalProfit = profit
+    };
+}</div>
+
+      <h3 style="color: var(--accent); margin-top: 20px;">DP Algorithm (Optimal Knapsack)</h3>
+      <div class="code-block">public static PortfolioResult DPOptimize(
+    List&lt;Mortgage&gt; mortgages, 
+    decimal budget)
+{
+    // Convert to cents for integer DP
+    int budgetCents = (int)(budget * 100);
+    int n = mortgages.Count;
+
+    // dp[w] = max profit with budget w
+    var dp = new decimal[budgetCents + 1];
+    // track[w] = indices of selected mortgages at budget w
+    var track = new List&lt;int&gt;[budgetCents + 1];
+    
+    for (int i = 0; i &lt;= budgetCents; i++)
+        track[i] = new List&lt;int&gt;();
+
+    // Fill DP table
+    for (int i = 0; i &lt; n; i++)
+    {
+        int cost = (int)(mortgages[i].Principal * 100);
+        decimal value = mortgages[i].Profit;
+
+        // Backwards to avoid reusing item
+        for (int w = budgetCents; w &gt;= cost; w--)
+        {
+            decimal withItem = dp[w - cost] + value;
+            if (withItem &gt; dp[w])
+            {
+                dp[w] = withItem;
+                track[w] = new List&lt;int&gt;(track[w - cost]);
+                track[w].Add(i);
+            }
+        }
+    }
+
+    // Find best solution at or under budget
+    int bestW = budgetCents;
+    for (int w = budgetCents - 1; w &gt;= 0; w--)
+    {
+        if (dp[w] &gt; dp[bestW])
+            bestW = w;
+    }
+
+    var selected = track[bestW]
+        .Select(idx => mortgages[idx])
+        .ToList();
+
+    decimal totalSpent = selected
+        .Sum(m => m.Principal);
+    decimal totalProfit = selected
+        .Sum(m => m.Profit);
+
+    return new PortfolioResult
+    {
+        Selected = selected,
+        TotalSpent = totalSpent,
+        TotalProfit = totalProfit
+    };
+}</div>
+
+      <h3 style="color: var(--accent); margin-top: 20px;">Usage Example</h3>
+      <div class="code-block">var mortgages = new List&lt;Mortgage&gt; { /* ... */ };
+decimal budget = 5.0m; // $5M
+
+var greedyResult = GreedyOptimize(mortgages, budget);
+var dpResult = DPOptimize(mortgages, budget);
+
+Console.WriteLine($"Greedy: {greedyResult.Selected.Count} mortgages, ${greedyResult.TotalProfit}M profit");
+Console.WriteLine($"DP:     {dpResult.Selected.Count} mortgages, ${dpResult.TotalProfit}M profit");</div>
+
+      <h3 style="color: var(--accent-2); margin-top: 20px;">Key Differences</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px;">
+        <div style="background: rgba(32,223,159,0.08); border: 1px solid rgba(32,223,159,0.3); border-radius: 10px; padding: 12px;">
+          <strong style="color: var(--accent);">Greedy</strong>
+          <ul style="margin: 8px 0; padding-left: 20px; color: var(--muted); font-size: 13px;">
+            <li>O(n log n) time (sort)</li>
+            <li>O(n) space</li>
+            <li>Fast, not guaranteed optimal</li>
+            <li>Good for 1000+ mortgages</li>
+          </ul>
+        </div>
+        <div style="background: rgba(255,159,67,0.08); border: 1px solid rgba(255,159,67,0.3); border-radius: 10px; padding: 12px;">
+          <strong style="color: var(--accent-2);">DP (0/1 Knapsack)</strong>
+          <ul style="margin: 8px 0; padding-left: 20px; color: var(--muted); font-size: 13px;">
+            <li>O(n × budget) time</li>
+            <li>O(budget) space</li>
+            <li>Guarantees optimal</li>
+            <li>Works for large pools</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const fmt = (n) => '$' + (n >= 1 ? n.toFixed(2) + 'M' : (n * 1000000).toLocaleString('en-US', { maximumFractionDigits: 0 }));
+    const fmtPct = (n) => (n * 100).toFixed(1) + '%';
+
+    let mortgages = [];
+
+    function generateMortgages() {
+      const poolSize = parseInt(document.getElementById('poolSize').value, 10);
+      mortgages = [];
+
+      const rng = (seed) => {
+        let x = seed;
+        return () => { x ^= x << 13; x ^= x >> 17; x ^= x << 5; return Math.abs(x); };
+      };
+      const rand = rng(12345 + poolSize);
+
+      for (let i = 0; i < poolSize; i++) {
+        const principal = 150000 + (rand() % 600) * 10000; // $150k - $750k
+        const rate = 0.035 + (rand() % 600) / 10000; // 3.5% - 9.5%
+        const years = 15 + (rand() % 16); // 15-30 years
+        const months = years * 12;
+
+        // Monthly payment
+        const m = rate / 12;
+        const pow = Math.pow(1 + m, months);
+        const monthlyPayment = principal * m * pow / (pow - 1);
+
+        // Total interest
+        const totalInterest = monthlyPayment * months - principal;
+
+        // Expected profit (assume 2-5% margin on interest)
+        const profitMargin = 0.02 + (rand() % 300) / 10000; // 2% - 5%
+        const expectedProfit = totalInterest * profitMargin;
+
+        mortgages.push({
+          id: i,
+          principal: principal / 1000000, // in millions
+          rate: rate * 100,
+          years,
+          monthlyPayment: monthlyPayment / 1000,
+          interest: totalInterest / 1000000,
+          profit: expectedProfit / 1000000,
+          roi: (expectedProfit / principal)
+        });
+      }
+
+      renderMortgageList();
+      document.getElementById('m-available').textContent = poolSize;
+    }
+
+    function renderMortgageList() {
+      const list = document.getElementById('pool-summary');
+      
+      // Calculate pool statistics
+      const totalPrincipal = mortgages.reduce((sum, m) => sum + m.principal, 0);
+      const avgRate = mortgages.reduce((sum, m) => sum + m.rate, 0) / mortgages.length;
+      const avgROI = mortgages.reduce((sum, m) => sum + m.roi, 0) / mortgages.length;
+      const totalProfit = mortgages.reduce((sum, m) => sum + m.profit, 0);
+
+      list.innerHTML = `
+        <div class="pool-stats">
+          <div class="pool-stat">
+            <span class="label">Total pool principal</span>
+            <span class="val">${fmt(totalPrincipal)}</span>
+          </div>
+          <div class="pool-stat">
+            <span class="label">Avg interest rate</span>
+            <span class="val">${avgRate.toFixed(2)}%</span>
+          </div>
+          <div class="pool-stat">
+            <span class="label">Avg ROI (profit)</span>
+            <span class="val">${fmtPct(avgROI)}</span>
+          </div>
+          <div class="pool-stat">
+            <span class="label">Total profit potential</span>
+            <span class="val">${fmt(totalProfit)}</span>
+          </div>
+        </div>
+        <div style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 10px; border: 1px solid rgba(255,255,255,0.05); font-size: 12px;">
+          <div style="color: var(--accent); margin-bottom: 4px;"><strong>${mortgages.length} mortgages</strong> in pool</div>
+          <div style="color: var(--muted);">Principal range: $${mortgages.map(m => m.principal).sort((a,b)=>a-b)[0].toFixed(2)}M — $${mortgages.map(m => m.principal).sort((a,b)=>b-a)[0].toFixed(2)}M</div>
+        </div>
+      `;
+    }
+
+    function greedy(mortgages, budget) {
+      const sorted = [...mortgages].sort((a, b) => b.roi - a.roi);
+      const chosen = [];
+      let spent = 0, value = 0;
+      const trace = [];
+
+      trace.push(`<div class="info">📊 Sorting by ROI (highest first)...</div>`);
+      
+      for (const m of sorted) {
+        if (spent + m.principal <= budget) {
+          chosen.push(m);
+          spent += m.principal;
+          value += m.profit;
+          trace.push(`<div class="pick">✓ Pick mortgage #${m.id + 1}: $${m.principal.toFixed(2)}M @ ${m.rate.toFixed(2)}% (ROI ${fmtPct(m.roi)}) → Running: $${spent.toFixed(2)}M / $${budget}M</div>`);
+        } else {
+          const wouldBe = spent + m.principal;
+          trace.push(`<div class="skip">✗ Skip mortgage #${m.id + 1}: $${m.principal.toFixed(2)}M (would exceed: $${wouldBe.toFixed(2)}M > $${budget}M)</div>`);
+        }
+      }
+
+      trace.push(`<div class="info">Final: ${chosen.length} mortgages, $${spent.toFixed(2)}M deployed, $${value.toFixed(2)}M profit</div>`);
+      return { chosen, spent, value, trace: trace.join('') };
+    }
+
+    function dpOptimal(mortgages, budget) {
+      // Standard 0/1 Knapsack DP
+      const budgetCents = Math.round(budget * 100); // Use cents for precision (avoid floating point)
+      const n = mortgages.length;
+
+      // dp[w] = { maxProfit, selectedIndices }
+      const dp = new Array(budgetCents + 1).fill(null).map(() => ({ profit: 0, items: [] }));
+      const trace = [];
+
+      trace.push(`<div class="info">🧮 Building DP table (${n} mortgages, budget $${budget}M = ${budgetCents} cents)...</div>`);
+
+      // Process each mortgage
+      for (let i = 0; i < n; i++) {
+        const mortgageCost = Math.round(mortgages[i].principal * 100); // Convert to cents
+        const mortgageValue = mortgages[i].profit;
+
+        // Iterate backwards to avoid using same item twice
+        for (let w = budgetCents; w >= mortgageCost; w--) {
+          const withoutMortgage = dp[w].profit;
+          const withMortgage = dp[w - mortgageCost].profit + mortgageValue;
+
+          if (withMortgage > withoutMortgage) {
+            dp[w].profit = withMortgage;
+            dp[w].items = [...dp[w - mortgageCost].items, i];
+          }
+        }
+      }
+
+      // Find best solution at or under budget
+      let bestBudget = budgetCents;
+      let bestProfit = dp[budgetCents].profit;
+      let bestItems = dp[budgetCents].items;
+
+      for (let w = budgetCents - 1; w >= 0; w--) {
+        if (dp[w].profit > bestProfit) {
+          bestProfit = dp[w].profit;
+          bestBudget = w;
+          bestItems = dp[w].items;
+        }
+      }
+
+      // Convert back to mortgages
+      const chosen = bestItems.map(idx => mortgages[idx]);
+      const spent = chosen.reduce((sum, m) => sum + m.principal, 0);
+      const value = chosen.reduce((sum, m) => sum + m.profit, 0);
+
+      if (chosen.length === 0) {
+        trace.push(`<div class="error">⚠ No mortgages fit in budget</div>`);
+      } else {
+        trace.push(`<div class="pick">✓ Optimal selection found:</div>`);
+        bestItems.forEach(idx => {
+          const m = mortgages[idx];
+          trace.push(`<div class="pick">&nbsp;&nbsp;→ Mortgage #${m.id + 1}: $${m.principal.toFixed(2)}M @ ${m.rate.toFixed(2)}% (profit: $${m.profit.toFixed(3)}M)</div>`);
+        });
+      }
+
+      trace.push(`<div class="info">Final: ${chosen.length} mortgages, $${spent.toFixed(2)}M deployed, $${value.toFixed(2)}M profit</div>`);
+      return { chosen, spent, value, trace: trace.join('') };
+    }
+
+    function renderTable(mortgages, selected) {
+      const selectedSet = new Set(selected.map(m => m.id));
+      const selectedMortgages = mortgages.filter(m => selectedSet.has(m.id));
+      
+      if (selectedMortgages.length === 0) {
+        return '<p style="color: var(--muted); font-size: 13px;">No mortgages selected</p>';
+      }
+
+      return `
+        <p style="color: var(--muted); font-size: 12px; margin: 0 0 10px;">Showing ${selectedMortgages.length} selected mortgages</p>
+        <table class="portfolio-table">
+          <tr>
+            <th>#</th>
+            <th>Principal</th>
+            <th>Rate</th>
+            <th>Term</th>
+            <th>Est. Profit</th>
+            <th>ROI</th>
+          </tr>
+          ${selectedMortgages.map((m, i) => `
+            <tr class="selected">
+              <td>${m.id + 1}</td>
+              <td>${fmt(m.principal)}</td>
+              <td>${m.rate.toFixed(2)}%</td>
+              <td>${m.years}y</td>
+              <td>${fmt(m.profit)}</td>
+              <td>${fmtPct(m.roi)}</td>
+            </tr>
+          `).join('')}
+        </table>
+      `;
+    }
+
+    function run() {
+      if (mortgages.length === 0) {
+        alert('Generate mortgages first');
+        return;
+      }
+
+      const budget = parseFloat(document.getElementById('budget').value || '0');
+      const greedyPlan = greedy(mortgages, budget);
+      const dpPlan = dpOptimal(mortgages, budget);
+
+      // Display tables
+      document.getElementById('greedy-table').innerHTML = renderTable(mortgages, greedyPlan.chosen);
+      document.getElementById('dp-table').innerHTML = renderTable(mortgages, dpPlan.chosen);
+
+      // Display traces
+      document.getElementById('greedy-trace').innerHTML = greedyPlan.trace;
+      document.getElementById('dp-trace').innerHTML = dpPlan.trace;
+
+      // Display metrics
+      const greedyROI = greedyPlan.spent === 0 ? 0 : (greedyPlan.value / greedyPlan.spent);
+      const dpROI = dpPlan.spent === 0 ? 0 : (dpPlan.value / dpPlan.spent);
+
+      document.getElementById('m-budget').textContent = fmt(budget);
+      document.getElementById('m-greedy-count').textContent = greedyPlan.chosen.length;
+      document.getElementById('m-dp-count').textContent = dpPlan.chosen.length;
+
+      document.getElementById('greedy-count').textContent = greedyPlan.chosen.length;
+      document.getElementById('greedy-deployed').textContent = fmt(greedyPlan.spent);
+      document.getElementById('greedy-value').textContent = fmt(greedyPlan.value);
+      document.getElementById('greedy-roi').textContent = fmtPct(greedyROI);
+
+      document.getElementById('dp-count').textContent = dpPlan.chosen.length;
+      document.getElementById('dp-deployed').textContent = fmt(dpPlan.spent);
+      document.getElementById('dp-value').textContent = fmt(dpPlan.value);
+      document.getElementById('dp-roi').textContent = fmtPct(dpROI);
+
+      // Advantage
+      const advantage = dpPlan.value - greedyPlan.value;
+      if (advantage > 0) {
+        document.getElementById('advantage').innerHTML = `<span style="color:var(--accent);">DP found <strong>${fmt(advantage)}</strong> more value</span> by selecting different mortgages (${dpPlan.chosen.length} vs ${greedyPlan.chosen.length}).`;
+      } else if (advantage === 0) {
+        document.getElementById('advantage').innerHTML = `Both algorithms found the same optimal result.`;
+      } else {
+        document.getElementById('advantage').innerHTML = `Greedy found <strong>${fmt(Math.abs(advantage))}</strong> more value.`;
+      }
+    }
+
+    document.getElementById('generate').addEventListener('click', generateMortgages);
+    document.getElementById('run').addEventListener('click', run);
+
+    generateMortgages();
+  </script>
+</body>
+</html>
