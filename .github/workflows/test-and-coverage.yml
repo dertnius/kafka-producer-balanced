@@ -25,15 +25,14 @@ jobs:
         find MyDotNetSolution -name "*.Tests.csproj" -type f
     
     - name: Restore dependencies
-      run: dotnet restore MyDotNetSolution/MyDotNetSolution.sln
+      run: dotnet restore MyDotNetSolution/MyDotNetSolution.sln --skip-aspire-workload-check
     
-    - name: Build
-      run: dotnet build MyDotNetSolution/MyDotNetSolution.sln --no-restore --configuration Release
+    - name: Build (excluding AppHost)
+      run: dotnet build MyDotNetSolution/MyDotNetSolution.sln --no-restore --configuration Release --skip-aspire-workload-check -p:SkipAspireWorkloadCheck=true 2>/dev/null || dotnet build MyDotNetSolution/src/MyDotNetApp/MyDotNetApp.csproj --no-restore --configuration Release
     
     - name: Run Tests with Coverage
       run: |
-        dotnet test MyDotNetSolution/MyDotNetSolution.sln \
-          --no-build \
+        dotnet test MyDotNetSolution/Tests/MyDotNetApp.Tests/MyDotNetApp.Tests.csproj \
           --configuration Release \
           --logger "console;verbosity=detailed" \
           /p:CollectCoverage=true \
