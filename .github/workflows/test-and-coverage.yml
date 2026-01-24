@@ -20,42 +20,46 @@ jobs:
       with:
         dotnet-version: '8.0.x'
     
-    - name: Restore dependencies
+    - name: Find and list test projects
       run: |
-        cd MyDotNetSolution
-        dotnet restore
+        find MyDotNetSolution -name "*.Tests.csproj" -type f
+    
+    - name: Restore dependencies
+      run: dotnet restore MyDotNetSolution/MyDotNetSolution.sln
     
     - name: Build
-      run: |
-        cd MyDotNetSolution
-        dotnet build --no-restore --configuration Release
+      run: dotnet build MyDotNetSolution/MyDotNetSolution.sln --no-restore --configuration Release
     
     - name: Run Tests with Coverage
       run: |
-        cd MyDotNetSolution
-        dotnet test Tests/MyDotNetApp.Tests/MyDotNetApp.Tests.csproj \
+        dotnet test MyDotNetSolution/MyDotNetSolution.sln \
           --no-build \
           --configuration Release \
           --logger "console;verbosity=detailed" \
           /p:CollectCoverage=true \
           /p:CoverletOutputFormat=cobertura \
-          /p:CoverletOutput=./TestResults \
-          /p:Exclude="[*Tests]*,[*ServiceDefaults]*"
+          /p:CoverletOutput=./coverage \
+          /p:Exclude="[*Tests]*,[*ServiceDefaults]*" \
+          --results-directory=TestResults
+    
+    - name: Find coverage file
+      run: |
+        find MyDotNetSolution -name "coverage.cobertura.xml" -type f
     
     - name: Generate Coverage Report
       if: success()
       run: |
-        cd MyDotNetSolution
         dotnet tool install -g ReportGenerator
-        reportgenerator -reports:"Tests/MyDotNetApp.Tests/TestResults/coverage.cobertura.xml" \
-          -targetdir:"../docs/coverage" \
+        COVERAGE_FILE=$(find MyDotNetSolution -name "coverage.cobertura.xml" -type f | head -1)
+        echo "Found coverage file: $COVERAGE_FILE"
+        reportgenerator -reports:"$COVERAGE_FILE" \
+          -targetdir:"docs/coverage" \
           -reporttypes:"Html;Badges" \
           -title:"Test Coverage Report"
     
     - name: Commit and push coverage report
       if: success()
       run: |
-        cd .
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add docs/coverage/ 2>/dev/null || true
@@ -67,6 +71,6 @@ jobs:
       run: |
         echo "## Test & Coverage Summary" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        echo "✅ Tests completed successfully" >> $GITHUB_STEP_SUMMARY
+        echo "✅ Tests executed" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "📊 Coverage Report: [View Coverage](https://dertnius.github.io/kafka-producer-balanced/#/coverage/)" >> $GITHUB_STEP_SUMMARY
