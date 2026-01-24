@@ -4,7 +4,7 @@ VisualStudioVersion = 16.0.30013.200
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4F-00C04F79EFBC}") = "MyDotNetApp", "src\MyDotNetApp\MyDotNetApp.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4F-00C04F79EFBC}") = "MyDotNetApp.Tests", "tests\MyDotNetApp.Tests\MyDotNetApp.Tests.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
+Project("{FAE04EC0-301F-11D3-BF4F-00C04F79EFBC}") = "MyDotNetApp.Tests", "Tests\MyDotNetApp.Tests\MyDotNetApp.Tests.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MyDotNetApp.AppHost", "MyDotNetApp.AppHost\MyDotNetApp.AppHost.csproj", "{144E5304-4DF0-46BC-9ACC-3F4B290258C8}"
 EndProject
