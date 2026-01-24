@@ -51,13 +51,13 @@ jobs:
     - name: Generate Coverage Report
       if: success()
       run: |
-        dotnet tool install -g ReportGenerator
+        dotnet tool install -g dotnet-reportgenerator-globaltool
         COVERAGE_FILE=$(find MyDotNetSolution -name "coverage.cobertura.xml" -type f | head -1)
         echo "Found coverage file: $COVERAGE_FILE"
-        reportgenerator -reports:"$COVERAGE_FILE" \
-          -targetdir:"docs/coverage" \
-          -reporttypes:"Html;Badges" \
-          -title:"Test Coverage Report"
+        reportgenerator "-reports:$COVERAGE_FILE" \
+          "-targetdir:docs/coverage" \
+          "-reporttypes:Html;Badges" \
+          "-title:Test Coverage Report"
     
     - name: Commit and push coverage report
       if: success()
