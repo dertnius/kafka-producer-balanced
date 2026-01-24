@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Coverage Report</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .status {
+            padding: 15px;
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        .status strong {
+            color: #856404;
+        }
+        .info {
+            color: #666;
+            line-height: 1.6;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📊 Test Coverage Report</h1>
+        
+        <div class="status">
+            <strong>⏳ Coverage Report Generation In Progress</strong>
+        </div>
+        
+        <div class="info">
+            <p>The test coverage report is automatically generated on every push to GitHub via the <code>Test & Coverage Report</code> workflow.</p>
+            
+            <h3>How it works:</h3>
+            <ol>
+                <li>Tests are executed with code coverage collection enabled</li>
+                <li>ReportGenerator creates an HTML coverage report</li>
+                <li>The report is committed and deployed to GitHub Pages</li>
+            </ol>
+            
+            <h3>Current Status:</h3>
+            <ul>
+                <li>✅ Workflow configured and active</li>
+                <li>✅ Tests running on every push</li>
+                <li>⏳ Coverage report generating...</li>
+            </ul>
+            
+            <h3>View the workflow:</h3>
+            <p><a href="https://github.com/dertnius/kafka-producer-balanced/actions" target="_blank" style="color: #007bff;">GitHub Actions - Test & Coverage Report</a></p>
+            
+            <h3>Local Testing:</h3>
+            <p>To generate a coverage report locally, run:</p>
+            <pre style="background: #f4f4f4; padding: 10px; border-radius: 4px; overflow-x: auto;">
+cd MyDotNetSolution
+dotnet test Tests/MyDotNetApp.Tests/MyDotNetApp.Tests.csproj \
+  --configuration Release \
+  --collect:"XPlat Code Coverage" \
+  --results-directory:TestResults
+            </pre>
+        </div>
+    </div>
+</body>
+</html>
