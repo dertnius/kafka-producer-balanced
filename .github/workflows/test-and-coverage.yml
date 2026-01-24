@@ -39,7 +39,7 @@ jobs:
           --logger "console;verbosity=detailed" \
           /p:CollectCoverage=true \
           /p:CoverletOutputFormat=cobertura \
-          /p:CoverletOutput=./coverage/ \
+          /p:CoverletOutput=./TestResults \
           /p:Exclude="[*Tests]*,[*ServiceDefaults]*"
     
     - name: Generate Coverage Report
@@ -47,7 +47,7 @@ jobs:
       run: |
         cd MyDotNetSolution
         dotnet tool install -g ReportGenerator
-        reportgenerator -reports:"Tests/MyDotNetApp.Tests/coverage/coverage.cobertura.xml" \
+        reportgenerator -reports:"Tests/MyDotNetApp.Tests/TestResults/coverage.cobertura.xml" \
           -targetdir:"../docs/coverage" \
           -reporttypes:"Html;Badges" \
           -title:"Test Coverage Report"
