@@ -1,6 +1,7 @@
 using System;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -13,6 +14,9 @@ using MyDotNetApp.Data.Concrete;
 using MyDotNetApp.Data.UnitOfWork;
 using System.Data;
 using Microsoft.Data.SqlClient;
+using OpenTelemetry.Trace;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Logs;
 
 public class Startup
 {
@@ -56,8 +60,8 @@ public class Startup
         // Register OutboxProcessingService
         services.AddScoped<OutboxProcessingService>();
 
-        // Add services
-        services.AddScoped<IOutboxService>(sp => 
+        // Add services - singleton for use by singleton hosted services
+        services.AddSingleton<IOutboxService>(sp => 
             new OutboxService(connectionString, sp.GetRequiredService<ILogger<OutboxService>>()));
         
         // Register shared Kafka producer pool (singleton so all services use same pool)
@@ -67,7 +71,7 @@ public class Startup
                 sp.GetRequiredService<ILogger<KafkaProducerPool>>(),
                 poolSize: 10));  // Match high-throughput needs
         
-        services.AddScoped<IKafkaService, KafkaService>();
+        services.AddSingleton<IKafkaService, KafkaService>();
 
         // Add batch publishing handler for high-performance publish updates
         var batchSize = Configuration.GetValue<int>("Publishing:BatchSize", 5000);
@@ -167,6 +171,20 @@ public class Startup
         app.UseEndpoints(endpoints =>
         {
             endpoints.MapControllers();
+            
+            // Add root endpoint that shows available endpoints
+            endpoints.MapGet("/", () => Results.Ok(new 
+            {
+                message = "MyDotNetApp API is running",
+                endpoints = new[]
+                {
+                    "/api/health",
+                    "/api/outbox/stats",
+                    "/api/outbox/trigger",
+                    "/api/outbox/stop",
+                    "/api/outbox/resume"
+                }
+            }));
         });
     }
 }

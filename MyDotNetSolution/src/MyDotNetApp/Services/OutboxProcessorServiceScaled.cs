@@ -19,6 +19,7 @@ using Avro;
 using Avro.Generic;
 using Confluent.SchemaRegistry;
 using Confluent.SchemaRegistry.Serdes;
+using MyDotNetApp.Diagnostics;
 
 namespace MyDotNetApp.Services;
 
@@ -161,9 +162,14 @@ public class OutboxProcessorServiceScaled : BackgroundService
                 // Wait for polling interval
                 await Task.Delay(_kafkaSettings.PollingIntervalMs, stoppingToken);
 
+                using var activity = Telemetry.ActivitySource.StartActivity("PollOutbox");
+                
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var messages = await GetUnprocessedMessagesAsync(stoppingToken);
                 sw.Stop();
+                
+                activity?.SetTag("messages.count", messages.Count);
+                activity?.SetTag("query.duration_ms", sw.Elapsed.TotalMilliseconds);
                 
                 if (messages.Count == 0)
                 {
@@ -193,6 +199,9 @@ public class OutboxProcessorServiceScaled : BackgroundService
                         _logger.LogDebug("Skipped duplicate message {MessageId} already in flight", message.Id);
                     }
                 }
+                
+                activity?.SetTag("messages.added", addedCount);
+                activity?.SetTag("messages.skipped", skippedCount);
                 
                 if (skippedCount > 0)
                 {

@@ -18,13 +18,14 @@ namespace MyDotNetApp.Tests
     /// Tests crash recovery scenarios for OutboxProcessorServiceScaled
     /// Verifies ordering guarantees, duplicate handling, and in-flight message recovery
     /// </summary>
-    public class OutboxProcessorCrashRecoveryTests
+    public class OutboxProcessorCrashRecoveryTests : IDisposable
     {
         private readonly ITestOutputHelper _output;
         private readonly Mock<ILogger<OutboxProcessorServiceScaled>> _mockLogger;
         private readonly Mock<IKafkaService> _mockKafkaService;
         private readonly Mock<IPublishBatchHandler> _mockPublishBatchHandler;
         private readonly KafkaOutboxSettings _kafkaSettings;
+        private bool _disposed = false;
 
         public OutboxProcessorCrashRecoveryTests(ITestOutputHelper output)
         {
@@ -44,6 +45,26 @@ namespace MyDotNetApp.Tests
                 MaxProducerBuffer = 1000,
                 DatabaseConnectionPoolSize = 10
             };
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    _mockLogger?.Reset();
+                    _mockKafkaService?.Reset();
+                    _mockPublishBatchHandler?.Reset();
+                }
+                _disposed = true;
+            }
         }
 
         [Fact]

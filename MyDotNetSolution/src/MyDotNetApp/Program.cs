@@ -1,40 +1,29 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using System;
-using MyDotNetApp.Logging;
-using Serilog;
 
 public class Program
 {
     public static void Main(string[] args)
     {
-        Log.Logger = LoggingConfiguration.CreateLogger();
-
-        try
-        {
-            Log.Information("Starting application");
-            CreateHostBuilder(args).Build().Run();
-        }
-        catch (Exception ex)
-        {
-            Log.Fatal(ex, "Application terminated unexpectedly");
-        }
-        finally
-        {
-            Log.CloseAndFlush();
-        }
+        var builder = WebApplication.CreateBuilder(args);
+        
+        // Add Aspire service defaults (OpenTelemetry, health checks, service discovery)
+        builder.AddServiceDefaults();
+        
+        // Configure services using Startup
+        var startup = new Startup(builder.Configuration);
+        startup.ConfigureServices(builder.Services);
+        
+        var app = builder.Build();
+        
+        // Configure middleware using Startup
+        var logger = app.Services.GetRequiredService<ILogger<Startup>>();
+        startup.Configure(app, app.Environment, logger);
+        
+        app.Run();
     }
-
-    public static IHostBuilder CreateHostBuilder(string[] args) =>
-        Host.CreateDefaultBuilder(args)
-            .UseSerilog(Log.Logger)
-            .ConfigureLogging((context, logging) =>
-            {
-                logging.ClearProviders();
-            })
-            .ConfigureWebHostDefaults(webBuilder =>
-            {
-                webBuilder.UseStartup<Startup>();
-            });
 }

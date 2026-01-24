@@ -14,10 +14,11 @@ using Xunit;
 
 namespace MyDotNetApp.Tests
 {
-    public class OutboxConsumerParallelTests
+    public class OutboxConsumerParallelTests : IDisposable
     {
         private readonly KafkaOutboxSettings _kafkaSettings;
         private readonly IConfiguration _configuration;
+        private bool _disposed = false;
 
         public OutboxConsumerParallelTests()
         {
@@ -43,6 +44,24 @@ namespace MyDotNetApp.Tests
             _configuration = new ConfigurationBuilder()
                 .AddInMemoryCollection(configDict)
                 .Build();
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    (_configuration as IDisposable)?.Dispose();
+                }
+                _disposed = true;
+            }
         }
 
         [Fact]

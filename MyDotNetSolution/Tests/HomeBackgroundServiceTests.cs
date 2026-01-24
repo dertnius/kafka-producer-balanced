@@ -12,12 +12,13 @@ using Xunit;
 
 namespace MyDotNetApp.Tests
 {
-    public class HomeBackgroundServiceTests
+    public class HomeBackgroundServiceTests : IDisposable
     {
         private readonly Mock<ILogger<HomeBackgroundService>> _loggerMock;
         private readonly Mock<IDbConnection> _dbConnectionMock;
         private readonly Mock<IProducer<string, string>> _kafkaProducerMock;
         private readonly HomeBackgroundService _service;
+        private bool _disposed = false;
 
         public HomeBackgroundServiceTests()
         {
@@ -30,6 +31,27 @@ namespace MyDotNetApp.Tests
                 _dbConnectionMock.Object,
                 _kafkaProducerMock.Object
             );
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    _loggerMock?.Reset();
+                    _dbConnectionMock?.Reset();
+                    _kafkaProducerMock?.Reset();
+                    _service?.Dispose();
+                }
+                _disposed = true;
+            }
         }
 
         [Fact]

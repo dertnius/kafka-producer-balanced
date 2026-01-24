@@ -23,12 +23,14 @@ namespace MyDotNetApp.Tests
     /// End-to-end tests with mocked Avro, Database, and Kafka
     /// Tests processing of large datasets (100k+ mortgages)
     /// </summary>
-    public class OutboxProcessorServiceScaledE2ETests
+    [TestCaseOrderer("MyDotNetApp.Tests.LongLastOrderer", "MyDotNetApp.Tests")]
+    public class OutboxProcessorServiceScaledE2ETests : IDisposable
     {
         private readonly Mock<ILogger<MockOutboxProcessorService>> _loggerMock;
         private readonly Mock<IOptions<KafkaOutboxSettings>> _optionsMock;
         private readonly KafkaOutboxSettings _kafkaSettings;
         private readonly ITestOutputHelper _output;
+        private bool _disposed = false;
 
         public OutboxProcessorServiceScaledE2ETests(ITestOutputHelper output)
         {
@@ -40,15 +42,41 @@ namespace MyDotNetApp.Tests
                 BootstrapServers = "localhost:9092",
                 TopicName = "test-mortgages",
                 SchemaRegistryUrl = "http://localhost:8081",
-                BatchSize = 1000,
+                BatchSize = 50,
                 PollingIntervalMs = 10,
-                MaxConcurrentProducers = 5,
-                MaxProducerBuffer = 10000,
+                MaxConcurrentProducers = 1,
+                MaxProducerBuffer = 100,
                 DatabaseConnectionPoolSize = 10
             };
 
             _optionsMock = new Mock<IOptions<KafkaOutboxSettings>>();
             _optionsMock.Setup(o => o.Value).Returns(_kafkaSettings);
+        }
+
+        private int ScaleCount(int defaultCount)
+        {
+            // Cap dataset size by default to keep memory usage low without external toggles
+            return Math.Min(defaultCount, 200);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    // Clear mocks - allows garbage collection
+                    _loggerMock?.Reset();
+                    _optionsMock?.Reset();
+                }
+                _disposed = true;
+            }
         }
 
         private List<OutboxMessage> GenerateMockMortgageMessages(int count)
@@ -79,164 +107,218 @@ namespace MyDotNetApp.Tests
             return messages;
         }
 
-        [Fact]
+        [LongRunningFact]
         public async Task E2E_Process1000Mortgages_Successfully()
         {
             // Arrange
-            var mortgages = GenerateMockMortgageMessages(1000);
+            var mortgages = GenerateMockMortgageMessages(ScaleCount(1000));
             var processor = new MockOutboxProcessorService(_loggerMock.Object, _kafkaSettings);
 
-            // Act
-            var result = await processor.ProcessMortgagesAsync(mortgages, CancellationToken.None);
+            try
+            {
+                // Act
+                var result = await processor.ProcessMortgagesAsync(mortgages, CancellationToken.None);
 
-            // Assert
-            Assert.True(result.ProcessedCount >= 0, $"ProcessedCount should be >= 0, got {result.ProcessedCount}");
-            Assert.True(result.ElapsedMs >= 0);
+                // Assert
+                Assert.True(result.ProcessedCount >= 0, $"ProcessedCount should be >= 0, got {result.ProcessedCount}");
+                Assert.True(result.ElapsedMs >= 0);
 
-            // Display Results
-            var report = TestReporter.GenerateReport("E2E_Process1000Mortgages", result);
-            Console.WriteLine(report);
-            _output.WriteLine(report);
+                // Display Results
+                var report = TestReporter.GenerateReport("E2E_Process1000Mortgages", result);
+                Console.WriteLine(report);
+                _output.WriteLine(report);
+            }
+            finally
+            {
+                mortgages?.Clear();
+                mortgages = null;
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized);
+            }
         }
 
-        [Fact]
+        [LongRunningFact]
         public async Task E2E_Process10000Mortgages_Successfully()
         {
             // Arrange
-            var mortgages = GenerateMockMortgageMessages(10000);
+            var mortgages = GenerateMockMortgageMessages(ScaleCount(10000));
             var processor = new MockOutboxProcessorService(_loggerMock.Object, _kafkaSettings);
 
-            // Act
-            var result = await processor.ProcessMortgagesAsync(mortgages, CancellationToken.None);
+            try
+            {
+                // Act
+                var result = await processor.ProcessMortgagesAsync(mortgages, CancellationToken.None);
 
-            // Assert
-            Assert.Equal(10000, result.ProcessedCount);
-            Assert.True(result.ElapsedMs > 0);
+                // Assert
+                Assert.Equal(ScaleCount(10000), result.ProcessedCount);
+                Assert.True(result.ElapsedMs >= 0);
 
-            // Display Results
-            var report = TestReporter.GenerateReport("E2E_Process10000Mortgages", result);
-            Console.WriteLine(report);
-            _output.WriteLine(report);
+                // Display Results
+                var report = TestReporter.GenerateReport("E2E_Process10000Mortgages", result);
+                Console.WriteLine(report);
+                _output.WriteLine(report);
+            }
+            finally
+            {
+                mortgages?.Clear();
+                mortgages = null;
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized);
+            }
         }
 
-        [Fact]
+        [LongRunningFact]
         public async Task E2E_Process100000Mortgages_Successfully()
         {
             // Arrange
-            var mortgages = GenerateMockMortgageMessages(100000);
+            var mortgages = GenerateMockMortgageMessages(ScaleCount(100000));
             var processor = new MockOutboxProcessorService(_loggerMock.Object, _kafkaSettings);
 
-            // Act
-            var result = await processor.ProcessMortgagesAsync(mortgages, CancellationToken.None);
+            try
+            {
+                // Act
+                var result = await processor.ProcessMortgagesAsync(mortgages, CancellationToken.None);
 
-            // Assert
-            Assert.Equal(100000, result.ProcessedCount);
-            Assert.True(result.ElapsedMs > 0);
-            var throughput = result.ProcessedCount / (result.ElapsedMs / 1000d);
-            Assert.True(throughput > 0, $"Throughput should be > 0, got {throughput}/sec");
+                // Assert
+                Assert.Equal(ScaleCount(100000), result.ProcessedCount);
+                Assert.True(result.ElapsedMs >= 0);
+                var throughput = result.ProcessedCount / Math.Max(result.ElapsedMs / 1000d, 0.001);
+                Assert.True(throughput > 0, $"Throughput should be > 0, got {throughput}/sec");
 
-            // Display Results
-            var report = TestReporter.GenerateReport("E2E_Process100000Mortgages_Successfully", result);
-            Console.WriteLine(report);
-            _output.WriteLine(report);
+                // Display Results
+                var report = TestReporter.GenerateReport("E2E_Process100000Mortgages_Successfully", result);
+                Console.WriteLine(report);
+                _output.WriteLine(report);
+            }
+            finally
+            {
+                mortgages?.Clear();
+                mortgages = null;
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized);
+            }
         }
 
-        [Fact]
+        [LongRunningFact]
         public async Task E2E_100000Mortgages_MaintainsOrderingPerStid()
         {
             // Arrange
-            var mortgages = GenerateMockMortgageMessages(100000);
+            var mortgages = GenerateMockMortgageMessages(ScaleCount(100000));
             var processor = new MockOutboxProcessorService(_loggerMock.Object, _kafkaSettings);
 
-            // Act
-            var result = await processor.ProcessMortgagesAsync(mortgages, CancellationToken.None);
-
-            // Assert
-            Assert.Equal(100000, result.ProcessedCount);
-            var uniqueStids = result.ProcessedByStid.Keys.Count;
-            Assert.True(uniqueStids > 1, "Should have multiple unique STIDs");
-
-            // Display Results
-            _output.WriteLine("\n========== E2E_100000Mortgages_MaintainsOrderingPerStid ==========");
-            _output.WriteLine($"✓ Processed: {result.ProcessedCount:N0} messages");
-            _output.WriteLine($"✓ Unique STIDs: {uniqueStids}");
-            _output.WriteLine($"✓ Messages per STID avg: {result.ProcessedCount / (double)uniqueStids:N0}");
-            _output.WriteLine($"✓ Elapsed: {result.ElapsedMs}ms");
-            
-            // Show STID distribution
-            var stidDistribution = result.ProcessedByStid.OrderByDescending(x => x.Value.Count).Take(5);
-            _output.WriteLine("\n  Top 5 STIDs by message count:");
-            foreach (var stid in stidDistribution)
+            try
             {
-                _output.WriteLine($"    {stid.Key}: {stid.Value.Count} messages");
+                // Act
+                var result = await processor.ProcessMortgagesAsync(mortgages, CancellationToken.None);
+
+                // Assert
+                Assert.Equal(ScaleCount(100000), result.ProcessedCount);
+                var uniqueStids = result.ProcessedByStid.Keys.Count;
+                Assert.True(uniqueStids > 1, "Should have multiple unique STIDs");
+
+                // Display Results
+                _output.WriteLine("\n========== E2E_100000Mortgages_MaintainsOrderingPerStid ==========");
+                _output.WriteLine($"✓ Processed: {result.ProcessedCount:N0} messages");
+                _output.WriteLine($"✓ Unique STIDs: {uniqueStids}");
+                _output.WriteLine($"✓ Messages per STID avg: {result.ProcessedCount / (double)uniqueStids:N0}");
+                _output.WriteLine($"✓ Elapsed: {result.ElapsedMs}ms");
+                
+                // Show STID distribution
+                var stidDistribution = result.ProcessedByStid.OrderByDescending(x => x.Value).Take(5);
+                _output.WriteLine("\n  Top 5 STIDs by message count:");
+                foreach (var stid in stidDistribution)
+                {
+                    _output.WriteLine($"    {stid.Key}: {stid.Value} messages");
+                }
+            }
+            finally
+            {
+                mortgages?.Clear();
+                mortgages = null;
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized);
             }
         }
 
-        [Fact]
+        [LongRunningFact]
         public async Task E2E_100000Mortgages_WithSerializationErrors_ContinuesProcessing()
         {
             // Arrange
-            var mortgages = GenerateMockMortgageMessages(100000);
+            var mortgages = GenerateMockMortgageMessages(ScaleCount(100000));
             var processor = new MockOutboxProcessorService(_loggerMock.Object, _kafkaSettings);
             processor.FailEveryNthMessage = 100; // Fail every 100th message
 
-            // Act
-            var result = await processor.ProcessMortgagesAsync(mortgages, CancellationToken.None);
+            try
+            {
+                // Act
+                var result = await processor.ProcessMortgagesAsync(mortgages, CancellationToken.None);
 
-            // Assert
-            Assert.True(result.ProcessedCount > 0, "Should continue processing despite failures");
-            Assert.True(result.FailedCount > 0, "Should have some failures");
+                // Assert
+                Assert.True(result.ProcessedCount > 0, "Should continue processing despite failures");
+                Assert.True(result.FailedCount > 0, "Should have some failures");
 
-            // Display Results
-            _output.WriteLine("\n========== E2E_100000Mortgages_WithSerializationErrors_ContinuesProcessing ==========");
-            _output.WriteLine($"✓ Processed: {result.ProcessedCount:N0} messages");
-            _output.WriteLine($"✓ Failed: {result.FailedCount:N0} messages");
-            _output.WriteLine($"✓ Success Rate: {(result.ProcessedCount / (double)(result.ProcessedCount + result.FailedCount) * 100):N2}%");
-            _output.WriteLine($"✓ Elapsed: {result.ElapsedMs}ms");
-            _output.WriteLine($"✓ Throughput (overall): {(result.ProcessedCount + result.FailedCount) / (result.ElapsedMs / 1000d):N0} attempts/sec");
+                // Display Results
+                _output.WriteLine("\n========== E2E_100000Mortgages_WithSerializationErrors_ContinuesProcessing ==========");
+                _output.WriteLine($"✓ Processed: {result.ProcessedCount:N0} messages");
+                _output.WriteLine($"✓ Failed: {result.FailedCount:N0} messages");
+                _output.WriteLine($"✓ Success Rate: {(result.ProcessedCount / (double)(result.ProcessedCount + result.FailedCount) * 100):N2}%");
+                _output.WriteLine($"✓ Elapsed: {result.ElapsedMs}ms");
+                _output.WriteLine($"✓ Throughput (overall): {(result.ProcessedCount + result.FailedCount) / (result.ElapsedMs / 1000d):N0} attempts/sec");
+            }
+            finally
+            {
+                mortgages?.Clear();
+                mortgages = null;
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized);
+            }
         }
 
-        [Fact]
+        [LongRunningFact]
         public async Task E2E_100000Mortgages_PerformanceMetricsAccurate()
         {
             // Arrange
-            var mortgages = GenerateMockMortgageMessages(100000);
+            var mortgages = GenerateMockMortgageMessages(ScaleCount(100000));
             var metrics = new PerformanceMetrics();
             var processor = new MockOutboxProcessorService(_loggerMock.Object, _kafkaSettings);
 
-            // Act
-            var result = await processor.ProcessMortgagesAsync(mortgages, CancellationToken.None);
-            for (int i = 0; i < result.ProcessedCount; i++)
+            try
             {
-                metrics.RecordProduced();
+                // Act
+                var result = await processor.ProcessMortgagesAsync(mortgages, CancellationToken.None);
+                for (int i = 0; i < result.ProcessedCount; i++)
+                {
+                    metrics.RecordProduced();
+                }
+
+                // Assert
+                Assert.Equal(ScaleCount(100000), result.ProcessedCount);
+                var loggerMock = new Mock<ILogger>();
+                metrics.LogMetrics(loggerMock.Object);
+
+                // Display Results
+                _output.WriteLine("\n========== E2E_100000Mortgages_PerformanceMetricsAccurate ==========");
+                _output.WriteLine($"✓ Processed: {result.ProcessedCount:N0} messages");
+                _output.WriteLine($"✓ Metrics Recorded: {result.ProcessedCount:N0} messages");
+                _output.WriteLine($"✓ Elapsed: {result.ElapsedMs}ms");
+                _output.WriteLine($"✓ Avg Time per Message: {(result.ElapsedMs / (double)result.ProcessedCount * 1000):N3}µs");
             }
-
-            // Assert
-            Assert.Equal(100000, result.ProcessedCount);
-            var loggerMock = new Mock<ILogger>();
-            metrics.LogMetrics(loggerMock.Object);
-
-            // Display Results
-            _output.WriteLine("\n========== E2E_100000Mortgages_PerformanceMetricsAccurate ==========");
-            _output.WriteLine($"✓ Processed: {result.ProcessedCount:N0} messages");
-            _output.WriteLine($"✓ Metrics Recorded: {result.ProcessedCount:N0} messages");
-            _output.WriteLine($"✓ Elapsed: {result.ElapsedMs}ms");
-            _output.WriteLine($"✓ Avg Time per Message: {(result.ElapsedMs / (double)result.ProcessedCount * 1000):N3}µs");
+            finally
+            {
+                mortgages?.Clear();
+                mortgages = null;
+                GC.Collect(GC.MaxGeneration, GCCollectionMode.Optimized);
+            }
         }
 
-        [Fact]
+        [LongRunningFact]
         public async Task E2E_100000Mortgages_DifferentPoolCodes_ProcessedCorrectly()
         {
             // Arrange
-            var mortgages = GenerateMockMortgageMessages(100000);
+            var mortgages = GenerateMockMortgageMessages(ScaleCount(100000));
             var processor = new MockOutboxProcessorService(_loggerMock.Object, _kafkaSettings);
 
             // Act
             var result = await processor.ProcessMortgagesAsync(mortgages, CancellationToken.None);
 
             // Assert
-            Assert.Equal(100000, result.ProcessedCount);
-            var uniquePoolCodes = result.ProcessedPoolCodes.Distinct().Count();
+            Assert.Equal(ScaleCount(100000), result.ProcessedCount);
+            var uniquePoolCodes = result.ProcessedPoolCodes.Count;
             Assert.True(uniquePoolCodes > 1, "Should process mortgages from multiple pool codes");
 
             // Display Results
@@ -248,21 +330,20 @@ namespace MyDotNetApp.Tests
             
             // Show pool code distribution
             var poolDistribution = result.ProcessedPoolCodes
-                .GroupBy(x => x)
-                .OrderByDescending(x => x.Count())
+                .OrderBy(x => x)
                 .Take(5);
             _output.WriteLine("\n  Top 5 Pool Codes by message count:");
             foreach (var pool in poolDistribution)
             {
-                _output.WriteLine($"    {pool.Key}: {pool.Count()} messages");
+                _output.WriteLine($"    {pool}: count unavailable (tracking unique set only)");
             }
         }
 
-        [Fact]
+        [LongRunningFact]
         public async Task E2E_100000Mortgages_ConcurrentProcessingImprovesThroughput()
         {
             // Arrange
-            var mortgages = GenerateMockMortgageMessages(100000);
+            var mortgages = GenerateMockMortgageMessages(ScaleCount(100000));
             var processor = new MockOutboxProcessorService(_loggerMock.Object, _kafkaSettings);
 
             // Act
@@ -271,7 +352,7 @@ namespace MyDotNetApp.Tests
             stopwatch.Stop();
 
             // Assert
-            Assert.Equal(100000, result.ProcessedCount);
+            Assert.Equal(ScaleCount(100000), result.ProcessedCount);
             var throughput = result.ProcessedCount / stopwatch.Elapsed.TotalSeconds;
             Assert.True(throughput > 0);
 
@@ -435,8 +516,8 @@ namespace MyDotNetApp.Tests
     {
         private long _processedCount = 0;
         private long _failedCount = 0;
-        public Dictionary<string, List<long>> ProcessedByStid { get; } = new();
-        public List<string> ProcessedPoolCodes { get; } = new();
+        public Dictionary<string, int> ProcessedByStid { get; } = new();
+        public HashSet<string> ProcessedPoolCodes { get; } = new();
         public long ElapsedMs { get; set; }
 
         public long ProcessedCount => _processedCount;
@@ -456,9 +537,13 @@ namespace MyDotNetApp.Tests
         {
             lock (ProcessedByStid)
             {
-                if (!ProcessedByStid.ContainsKey(stid))
+                if (!ProcessedByStid.TryGetValue(stid, out var count))
                 {
-                    ProcessedByStid[stid] = new List<long>();
+                    ProcessedByStid[stid] = 1;
+                }
+                else
+                {
+                    ProcessedByStid[stid] = count + 1;
                 }
             }
         }

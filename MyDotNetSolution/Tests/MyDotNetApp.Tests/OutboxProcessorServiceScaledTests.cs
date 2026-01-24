@@ -17,7 +17,7 @@ using Xunit;
 
 namespace MyDotNetApp.Tests
 {
-    public class OutboxProcessorServiceScaledTests
+    public class OutboxProcessorServiceScaledTests : IDisposable
     {
         private readonly Mock<ILogger<OutboxProcessorServiceScaled>> _loggerMock;
         private readonly Mock<IOptions<KafkaOutboxSettings>> _optionsMock;
@@ -25,6 +25,7 @@ namespace MyDotNetApp.Tests
         private readonly Mock<IPublishBatchHandler> _publishBatchHandlerMock;
         private readonly KafkaOutboxSettings _kafkaSettings;
         private const string TestConnectionString = "Server=localhost;Database=test;";
+        private bool _disposed = false;
 
         public OutboxProcessorServiceScaledTests()
         {
@@ -46,6 +47,27 @@ namespace MyDotNetApp.Tests
 
             _optionsMock = new Mock<IOptions<KafkaOutboxSettings>>();
             _optionsMock.Setup(o => o.Value).Returns(_kafkaSettings);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    _loggerMock?.Reset();
+                    _optionsMock?.Reset();
+                    _kafkaServiceMock?.Reset();
+                    _publishBatchHandlerMock?.Reset();
+                }
+                _disposed = true;
+            }
         }
 
         [Fact]

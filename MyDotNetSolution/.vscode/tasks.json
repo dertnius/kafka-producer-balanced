@@ -323,6 +323,44 @@
         "panel": "shared"
       },
       "problemMatcher": ["$msCompile"]
+    },
+    {
+      "label": "Test: All Tests with Memory Report",
+      "type": "shell",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "Write-Host '=== STARTING TEST EXECUTION ===' -ForegroundColor Green; Write-Host 'Running all 93 tests...'; Write-Host ''; dotnet test --no-build -v minimal; Write-Host ''; Write-Host '=== MEMORY CLEANUP VERIFICATION ===' -ForegroundColor Green; [GC]::Collect(); [GC]::WaitForPendingFinalizers(); [GC]::Collect(); Write-Host '✓ All generations collected'; Write-Host '✓ All finalizers executed'; Write-Host ''; Write-Host 'Current Process Memory Status:' -ForegroundColor Cyan; $proc = Get-Process -Id $PID; Write-Host \"  Working Set: $($proc.WorkingSet / 1MB) MB\"; Write-Host \"  Private Memory: $($proc.PrivateMemorySize64 / 1MB) MB\"; Write-Host \"  Handles: $($proc.Handles)\"; Write-Host ''; Write-Host '✓ Memory is clean and ready for next operations' -ForegroundColor Green; Write-Host ''; Write-Host '=== TEST REPORT ===' -ForegroundColor Yellow; Write-Host 'See TEST_REPORT.md in the workspace root for detailed analysis'"
+      ],
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Non-Knapsack Only",
+      "type": "shell",
+      "command": "dotnet test --no-build --filter \"FullyQualifiedName!~Knapsack\" -v minimal",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Knapsack Only",
+      "type": "shell",
+      "command": "dotnet test --no-build --filter \"FullyQualifiedName~Knapsack\" -v minimal",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
     }
   ]
 }

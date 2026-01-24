@@ -1,0 +1,72 @@
+[
+  {
+    "Id": 1,
+    "Name": "Residential A",
+    "CapitalRequired": 120000,
+    "ExpectedReturn": 15000,
+    "InterestRate": 0.12,
+    "TermMonths": 180,
+    "LoanToValueRatio": 0.75,
+    "SecurityType": "Residential"
+  },
+  {
+    "Id": 2,
+    "Name": "Residential B",
+    "CapitalRequired": 95000,
+    "ExpectedReturn": 10500,
+    "InterestRate": 0.11,
+    "TermMonths": 240,
+    "LoanToValueRatio": 0.78,
+    "SecurityType": "Residential"
+  },
+  {
+    "Id": 3,
+    "Name": "Commercial A",
+    "CapitalRequired": 180000,
+    "ExpectedReturn": 23000,
+    "InterestRate": 0.128,
+    "TermMonths": 180,
+    "LoanToValueRatio": 0.70,
+    "SecurityType": "Commercial"
+  },
+  {
+    "Id": 4,
+    "Name": "Commercial B",
+    "CapitalRequired": 150000,
+    "ExpectedReturn": 19000,
+    "InterestRate": 0.12,
+    "TermMonths": 240,
+    "LoanToValueRatio": 0.72,
+    "SecurityType": "Commercial"
+  },
+  {
+    "Id": 5,
+    "Name": "Industrial A",
+    "CapitalRequired": 130000,
+    "ExpectedReturn": 16000,
+    "InterestRate": 0.118,
+    "TermMonths": 120,
+    "LoanToValueRatio": 0.68,
+    "SecurityType": "Industrial"
+  },
+  {
+    "Id": 6,
+    "Name": "Industrial B",
+    "CapitalRequired": 80000,
+    "ExpectedReturn": 10000,
+    "InterestRate": 0.125,
+    "TermMonths": 120,
+    "LoanToValueRatio": 0.65,
+    "SecurityType": "Industrial"
+  },
+  {
+    "Id": 7,
+    "Name": "Mixed Use A",
+    "CapitalRequired": 110000,
+    "ExpectedReturn": 13500,
+    "InterestRate": 0.115,
+    "TermMonths": 180,
+    "LoanToValueRatio": 0.73,
+    "SecurityType": "Mixed"
+  }
+]
