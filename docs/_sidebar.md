@@ -61,6 +61,10 @@
 * **Architecture & Data** 🏗️
   * [Database Schema](DATABASE_SCHEMA.sql)
   * [Mermaid Diagrams](mermaid.md)
+  * [Dapper Specification Pattern](DAPPER_SPECIFICATION_PATTERN.md)
+
+* **Integration Patterns** 🔧
+  * [EXE Execution with Quartz & Polly](EXE_EXECUTION_WITH_QUARTZ_POLLY.md)
 
 * **All Documentation** 📖
   * [Full Index](DOCUMENTATION_INDEX.md)
