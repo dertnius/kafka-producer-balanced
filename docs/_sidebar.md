@@ -46,6 +46,11 @@
   * [📊 Coverage Report](coverage.md)
   * [Error Handling Analysis](ERROR_HANDLING_ANALYSIS.md)
 
+* **Algorithm Simulations** 🎯
+  * [Knapsack Demo](knapsack-mortgage.html)
+  * [Portfolio Optimizer](mortgage-pool-optimizer.html)
+  * [Live Simulator](mortgage-simulator.html)
+
 * **Documentation & Summaries** 📚
   * [Documentation Index](DOCUMENTATION_INDEX.md)
   * [Implementation Summary](IMPLEMENTATION_SUMMARY.md)
