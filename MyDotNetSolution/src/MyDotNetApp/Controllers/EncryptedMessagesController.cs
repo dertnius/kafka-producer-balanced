@@ -32,8 +32,38 @@ public class EncryptedMessagesController : ControllerBase
     [HttpPost("send")]
     public async Task<IActionResult> SendEncryptedMessage([FromBody] EncryptedMessageRequest request)
     {
+        if (request == null)
+        {
+            return BadRequest(new { success = false, error = "Request cannot be null" });
+        }
+
+        if (request.Payload == null)
+        {
+            return BadRequest(new { success = false, error = "Payload cannot be null" });
+        }
+
+        if (string.IsNullOrWhiteSpace(request.EventType))
+        {
+            return BadRequest(new { success = false, error = "EventType is required" });
+        }
+
         try
         {
+            // Verify producer is injected
+            if (_avroProducer == null)
+            {
+                _logger.LogError("❌ CRITICAL: IAvroKafkaProducerWithCSFLE is NULL - Not registered in DI!");
+                return StatusCode(500, new 
+                { 
+                    success = false, 
+                    error = "Producer not initialized",
+                    details = "IAvroKafkaProducerWithCSFLE is not registered in dependency injection. Add services.AddSingleton<IAvroKafkaProducerWithCSFLE, AvroKafkaProducerWithCSFLE>() to Startup.cs"
+                });
+            }
+
+            _logger.LogInformation("📤 Calling ProduceAsync: Key={Key}, EventType={EventType}", 
+                request.Key ?? "auto-generated", request.EventType);
+
             var result = await _avroProducer.ProduceAsync(
                 topic: request.Topic ?? "encrypted-avro-messages",
                 key: request.Key ?? Guid.NewGuid().ToString(),
@@ -41,6 +71,21 @@ public class EncryptedMessagesController : ControllerBase
                 eventType: request.EventType,
                 metadata: request.Metadata
             );
+
+            // Verify result is not null
+            if (result == null)
+            {
+                _logger.LogError("❌ ProduceAsync returned NULL! This should never happen.");
+                return StatusCode(500, new 
+                { 
+                    success = false, 
+                    error = "Producer returned null result",
+                    details = "The Kafka producer returned a null DeliveryResult, which indicates an internal error"
+                });
+            }
+
+            _logger.LogInformation("✅ Message produced successfully: Topic={Topic}, Partition={Partition}, Offset={Offset}",
+                result.Topic, result.Partition.Value, result.Offset.Value);
 
             return Ok(new
             {
@@ -51,10 +96,37 @@ public class EncryptedMessagesController : ControllerBase
                 timestamp = result.Timestamp.UnixTimestampMs
             });
         }
+        catch (ArgumentException argEx)
+        {
+            _logger.LogError(argEx, "❌ VALIDATION ERROR: {Message}", argEx.Message);
+            return BadRequest(new { success = false, error = argEx.Message });
+        }
+        catch (InvalidOperationException opEx)
+        {
+            _logger.LogError(opEx, "❌ OPERATION ERROR: {Message}", opEx.Message);
+            return StatusCode(500, new { success = false, error = opEx.Message });
+        }
+        catch (AggregateException aggEx)
+        {
+            _logger.LogError(aggEx, "❌ AGGREGATE ERROR: {Message}", string.Join("; ", aggEx.InnerExceptions.Select(e => e.Message)));
+            return StatusCode(500, new 
+            { 
+                success = false, 
+                error = "One or more errors occurred during processing",
+                details = string.Join("; ", aggEx.InnerExceptions.Select(e => $"{e.GetType().Name}: {e.Message}"))
+            });
+        }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to send encrypted message");
-            return StatusCode(500, new { success = false, error = ex.Message });
+            _logger.LogError(ex, "❌ UNEXPECTED ERROR: {ExceptionType}: {Message}\n{StackTrace}", 
+                ex.GetType().Name, ex.Message, ex.StackTrace);
+            return StatusCode(500, new 
+            { 
+                success = false, 
+                error = ex.Message,
+                exceptionType = ex.GetType().Name,
+                details = $"{ex.GetType().FullName}: {ex.Message}. Check application logs for full stack trace."
+            });
         }
     }
 
@@ -104,12 +176,67 @@ public class EncryptedMessagesController : ControllerBase
     }
 
     /// <summary>
+    /// Diagnostic endpoint to check producer status
+    /// </summary>
+    [HttpGet("diagnostics")]
+    public IActionResult Diagnostics()
+    {
+        var diagnostics = new
+        {
+            timestamp = DateTimeOffset.UtcNow,
+            producerStatus = _avroProducer == null ? "NOT_REGISTERED" : "REGISTERED",
+            producerHealth = _avroProducer?.IsHealthy() ?? false ? "HEALTHY" : "UNHEALTHY",
+            checks = new[]
+            {
+                new
+                {
+                    check = "Producer Dependency Injection",
+                    status = _avroProducer == null ? "FAIL" : "PASS",
+                    message = _avroProducer == null 
+                        ? "IAvroKafkaProducerWithCSFLE not registered. Add services.AddSingleton<IAvroKafkaProducerWithCSFLE, AvroKafkaProducerWithCSFLE>() to Startup.cs ConfigureServices()"
+                        : "Producer is properly injected"
+                },
+                new
+                {
+                    check = "Configuration",
+                    status = "INFO",
+                    message = "Check appsettings.json for KafkaOutboxSettings and AzureKeyVault sections"
+                },
+                new
+                {
+                    check = "Error Handling",
+                    status = "INFO",
+                    message = "If ProduceAsync returns null, check application logs for detailed exception information"
+                }
+            },
+            troubleshooting = new
+            {
+                issue = "ProduceAsync returns null",
+                causes = new[]
+                {
+                    "Azure Key Vault authentication failed (check Azure credentials)",
+                    "Schema Registry connection failed (check if Confluent Schema Registry is running)",
+                    "Kafka broker connection failed (check if Kafka is running)",
+                    "Message serialization failed (check payload format)"
+                },
+                solution = "Check application logs in 'logs/' directory for detailed error messages"
+            }
+        };
+
+        _logger.LogInformation("📊 Diagnostics requested: {@Diagnostics}", diagnostics);
+        return Ok(diagnostics);
+    }
+
+    /// <summary>
     /// Health check
     /// </summary>
     [HttpGet("health")]
     public IActionResult Health()
     {
-        return Ok(new { status = "healthy", service = "EncryptedMessagesController" });
+        var isHealthy = _avroProducer?.IsHealthy() ?? false;
+        return isHealthy 
+            ? Ok(new { status = "healthy", service = "EncryptedMessagesController" })
+            : StatusCode(503, new { status = "unhealthy", service = "EncryptedMessagesController", message = "Producer not healthy" });
     }
 }
 

@@ -1,0 +1,10 @@
+name: Markdown Commit Agent
+description: Automatically commit and push new markdown files
+
+triggers:
+  - file_created: "*.md"
+
+actions:
+  - run: git add {{file}}
+  - run: git commit -m "docs: add {{file}}"
+  - run: git push

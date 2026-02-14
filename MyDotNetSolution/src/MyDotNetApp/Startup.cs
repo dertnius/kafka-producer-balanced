@@ -93,6 +93,10 @@ public class Startup
         // Configure Kafka settings
         services.Configure<KafkaOutboxSettings>(Configuration.GetSection("KafkaOutboxSettings"));
 
+        // ✅ ADD THIS: Register Azure Key Vault Service and Avro Producer with CSFLE
+        services.AddSingleton<IAzureKeyVaultService, AzureKeyVaultService>();
+        services.AddSingleton<IAvroKafkaProducerWithCSFLE, AvroKafkaProducerWithCSFLE>();
+
         // Register outbox processor as a singleton so API/manual triggers reach the running instance
         services.AddSingleton<OutboxProcessorServiceScaled>(sp =>
         {
