@@ -1,0 +1,14 @@
+project:
+  name: kafka-producer-balanced
+  language: csharp
+  runtime: dotnet
+
+openspec:
+  specs_root: openspec/specs
+  changes_root: openspec/changes
+
+domains:
+  - outbox-api
+  - outbox-processing
+  - kafka-publishing
+  - outbox-consumption
